@@ -1,0 +1,21 @@
+[project]
+name = "110-cinemas"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.0.6",
+    "django-htmx>=1.27.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "coverage>=7.14.1",
+    "pylint>=4.0.6",
+    "pylint-django>=2.7.0",
+    "pytest>=9.1.0",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.12.0",
+]
