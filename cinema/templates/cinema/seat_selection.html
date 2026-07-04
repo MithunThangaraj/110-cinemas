@@ -1,0 +1,28 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}Select a Seat - 110 Cinemas{% endblock %}
+
+{% block content %}
+<h2>{{ screening.movie.title }} - {{ screening.venue }} ({{ screening.start_time }})</h2>
+
+{% if show_error %}
+<p><strong>That seat was already reserved. Please pick another one.</strong></p>
+{% endif %}
+
+<ul>
+    {% for seat in seats %}
+    <li>
+        {{ seat.row }}{{ seat.number }} -
+        {% if seat.is_available %}
+        available
+        <form method="post" action="{% url 'reserve-seat' seat.id %}">
+            {% csrf_token %}
+            <button type="submit">Reserve</button>
+        </form>
+        {% else %}
+        reserved
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}
