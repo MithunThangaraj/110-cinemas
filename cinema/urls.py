@@ -18,6 +18,21 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from cinema import views
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("", views.index, name="index"),
+    path("movies/", views.movie_list, name="movie-list"),
+    path(
+        "screenings/<int:screening_id>/seats/",
+        views.seat_selection,
+        name="seat-selection",
+    ),
+    path("seats/<int:seat_id>/reserve/", views.reserve_seat_view, name="reserve-seat"),
+    path(
+        "reservations/<int:reservation_id>/",
+        views.reservation_confirmation,
+        name="reservation-confirmation",
+    ),
 ]

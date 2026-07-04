@@ -82,10 +82,6 @@ jobs=1
 # complex, nested conditions.
 limit-inference-results=100
 
-# List of plugins (as comma separated values of python module names) to load,
-# usually to register additional checkers.
-load-plugins=
-
 # Pickle collected data for later comparisons.
 persistent=yes
 

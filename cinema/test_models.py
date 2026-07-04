@@ -10,26 +10,6 @@ from .models import Movie, Reservation, Screening, Seat
 from .services import cancel_reservation, reserve_seat
 
 
-@pytest.fixture
-def movie():
-    return Movie.objects.create(
-        title="Dune: Part Three",
-        description="The sandworms return.",
-        release_date=date(2027, 10, 15),
-        runtime_minutes=165,
-    )
-
-
-@pytest.fixture
-def future_screening(movie):
-    return Screening.objects.create(
-        movie=movie,
-        venue="Auditorium 1",
-        start_time=timezone.now() + timedelta(days=7),
-        base_price="14.50",
-    )
-
-
 @pytest.mark.django_db
 class TestMovie:
     def test_create_movie(self):
@@ -158,8 +138,7 @@ class TestServices:
         second_seat = all_seats[1]
         reserve_seat(first_seat.id)
         available = [
-            s for s in Seat.objects.filter(screening=future_screening)
-            if s.is_available
+            s for s in Seat.objects.filter(screening=future_screening) if s.is_available
         ]
         assert first_seat not in available
         assert second_seat in available

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}110 Cinemas{% endblock %}</title>
+</head>
+<body>
+    <header>
+        <h1><a href="{% url 'movie-list' %}">110 Cinemas</a></h1>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

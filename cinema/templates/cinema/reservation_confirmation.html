@@ -1,0 +1,9 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}Reservation Confirmed - 110 Cinemas{% endblock %}
+
+{% block content %}
+<h2>Reservation {{ reservation.status }}</h2>
+<p>Booking ID: {{ reservation.booking_id }}</p>
+<p>Seat: {{ reservation.seat }}</p>
+{% endblock %}

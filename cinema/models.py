@@ -52,9 +52,7 @@ def generate_seats(screening, rows=SEAT_ROWS, cols=SEAT_COLS):
     for r in range(rows):
         row_label = chr(65 + r)
         for c in range(1, cols + 1):
-            seats.append(
-                Seat(screening=screening, row=row_label, number=c)
-            )
+            seats.append(Seat(screening=screening, row=row_label, number=c))
     Seat.objects.bulk_create(seats)
 
 
