@@ -7,7 +7,20 @@
 <body>
     <header>
         <h1><a href="{% url 'movie-list' %}">110 Cinemas</a></h1>
+        <nav>
+            <a href="{% url 'movie-list' %}">Movies</a>
+            <a href="{% url 'my-bookings' %}">My Bookings</a>
+        </nav>
     </header>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
     <main>
         {% block content %}{% endblock %}
     </main>

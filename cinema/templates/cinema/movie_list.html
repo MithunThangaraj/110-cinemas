@@ -6,20 +6,7 @@
 <h2>Now Showing</h2>
 <ul>
     {% for movie in movies %}
-    <li>
-        <strong>{{ movie.title }}</strong> ({{ movie.release_date }})
-        <ul>
-            {% for screening in movie.screenings.all %}
-            <li>
-                <a href="{% url 'seat-selection' screening.id %}">
-                    {{ screening.venue }} - {{ screening.start_time }}
-                </a>
-            </li>
-            {% empty %}
-            <li>No screenings scheduled.</li>
-            {% endfor %}
-        </ul>
-    </li>
+    {% include "cinema/_movie_card.html" %}
     {% empty %}
     <li>No movies available yet.</li>
     {% endfor %}
