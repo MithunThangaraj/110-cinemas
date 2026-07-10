@@ -1,0 +1,18 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}My Bookings - 110 Cinemas{% endblock %}
+
+{% block content %}
+<h2>My Bookings</h2>
+<ul>
+    {% for reservation in reservations %}
+    <li>
+        <a href="{% url 'reservation-confirmation' reservation.id %}">
+            {{ reservation.seat }} - {{ reservation.status }}
+        </a>
+    </li>
+    {% empty %}
+    <li>You have no bookings in this session yet.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
