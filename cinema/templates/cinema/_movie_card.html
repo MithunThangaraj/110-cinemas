@@ -1,0 +1,14 @@
+<li>
+    <strong>{{ movie.title }}</strong> ({{ movie.release_date }})
+    <ul>
+        {% for screening in movie.screenings.all %}
+        <li>
+            <a href="{% url 'seat-selection' screening.id %}">
+                {{ screening.venue }} - {{ screening.start_time }}
+            </a>
+        </li>
+        {% empty %}
+        <li>No screenings scheduled.</li>
+        {% endfor %}
+    </ul>
+</li>
