@@ -1,0 +1,17 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}Reserve a Seat - 110 Cinemas{% endblock %}
+
+{% block content %}
+<h2>Reserve seat {{ seat.row }}{{ seat.number }}</h2>
+<p>{{ seat.screening.movie.title }} - {{ seat.screening.venue }}
+   ({{ seat.screening.start_time }})</p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Confirm reservation</button>
+</form>
+
+<p><a href="{% url 'seat-selection' seat.screening_id %}">Back to seats</a></p>
+{% endblock %}

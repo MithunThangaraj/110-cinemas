@@ -1,11 +1,7 @@
 <li>
     {{ seat.row }}{{ seat.number }} -
     {% if seat.is_available %}
-    available
-    <form method="post" action="{% url 'reserve-seat' seat.id %}">
-        {% csrf_token %}
-        <button type="submit">Reserve</button>
-    </form>
+    available - <a href="{% url 'reserve-seat' seat.id %}">Reserve</a>
     {% else %}
     reserved
     {% endif %}

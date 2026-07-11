@@ -4,6 +4,12 @@
 
 {% block content %}
 <h2>Now Showing</h2>
+
+<form method="get">
+    {{ form.q }}
+    <button type="submit">Search</button>
+</form>
+
 <ul>
     {% for movie in movies %}
     {% include "cinema/_movie_card.html" %}

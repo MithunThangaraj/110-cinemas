@@ -25,5 +25,6 @@ class SeatAdmin(admin.ModelAdmin):
 
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ["booking_id", "seat", "status", "created_at"]
+    list_display = ["booking_id", "seat", "customer_name", "status", "created_at"]
     list_filter = ["status"]
+    search_fields = ["customer_name", "customer_email", "booking_id"]

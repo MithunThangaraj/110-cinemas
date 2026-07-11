@@ -5,13 +5,17 @@ from .models import Reservation, Seat
 
 
 @transaction.atomic
-def reserve_seat(seat_id):
+def reserve_seat(seat_id, customer_name="", customer_email=""):
     seat = Seat.objects.select_for_update().get(pk=seat_id)
 
     if not seat.is_available:
         raise ValidationError("Seat is already reserved.")
 
-    return Reservation.objects.create(seat=seat)
+    return Reservation.objects.create(
+        seat=seat,
+        customer_name=customer_name,
+        customer_email=customer_email,
+    )
 
 
 def cancel_reservation(reservation_id):
