@@ -30,7 +30,11 @@ urlpatterns = [
         views.seat_selection,
         name="seat-selection",
     ),
-    path("seats/<int:seat_id>/reserve/", views.reserve_seat_view, name="reserve-seat"),
+    path(
+        "screenings/<int:screening_id>/reserve/",
+        views.reserve_seats,
+        name="reserve-seats",
+    ),
     path(
         "reservations/<int:reservation_id>/",
         views.reservation_confirmation,

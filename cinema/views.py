@@ -1,14 +1,23 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django_htmx.http import HttpResponseClientRedirect
 
 from .forms import MovieSearchForm, ReservationForm
-from .models import Movie, Reservation, Screening, Seat
+from .models import Movie, Reservation, Screening
 from .services import reserve_seat
 
 # Session key under which we remember the booking IDs made in the current
 # visit, so a visitor can see "My Bookings" without needing an account.
 SESSION_BOOKINGS_KEY = "booking_ids"
+
+
+def _parse_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def index(request):
@@ -25,57 +34,67 @@ def movie_list(request):
 
 def seat_selection(request, screening_id):
     screening = get_object_or_404(Screening, pk=screening_id)
-    seats = screening.seats.all()
     return render(
         request,
         "cinema/seat_selection.html",
-        {"screening": screening, "seats": seats},
+        {
+            "screening": screening,
+            "seats": screening.seats.all(),
+            "form": ReservationForm(),
+        },
     )
 
 
-def _render_reservation_form(request, seat, form):
-    if request.htmx:
-        return render(
-            request, "cinema/_seat_reserve_form.html", {"seat": seat, "form": form}
-        )
-    return render(request, "cinema/reservation_form.html", {"seat": seat, "form": form})
+def _render_reservation_area(request, context):
+    # HTMX swaps only the reservation area; a normal request gets the full page.
+    template = (
+        "cinema/_reservation_area.html"
+        if request.htmx
+        else "cinema/seat_selection.html"
+    )
+    return render(request, template, context)
 
 
-def reserve_seat_view(request, seat_id):
-    seat = get_object_or_404(Seat, pk=seat_id)
-
-    if request.method != "POST":
-        return _render_reservation_form(request, seat, ReservationForm())
-
+def reserve_seats(request, screening_id):
+    screening = get_object_or_404(Screening, pk=screening_id)
     form = ReservationForm(request.POST)
-    if not form.is_valid():
-        return _render_reservation_form(request, seat, form)
+
+    seat_id = _parse_int(request.POST.get("seat"))
+    seat = screening.seats.filter(pk=seat_id).first() if seat_id else None
+
+    context = {
+        "screening": screening,
+        "seats": screening.seats.all(),
+        "form": form,
+        "selected_seat_id": seat.id if seat else None,
+    }
+
+    if seat is None:
+        context["seat_error"] = "Please choose a seat first."
+    if seat is None or not form.is_valid():
+        return _render_reservation_area(request, context)
 
     try:
         reservation = reserve_seat(
-            seat_id,
+            seat.id,
             customer_name=form.cleaned_data["customer_name"],
             customer_email=form.cleaned_data["customer_email"],
         )
     except ValidationError:
-        if request.htmx:
-            return render(request, "cinema/_seat.html", {"seat": seat})
-        messages.error(
-            request, "That seat was already reserved. Please pick another one."
-        )
-        return redirect("seat-selection", screening_id=seat.screening_id)
+        context["selected_seat_id"] = None
+        context["seat_error"] = "That seat was just taken. Please choose another one."
+        return _render_reservation_area(request, context)
 
     booking_ids = request.session.setdefault(SESSION_BOOKINGS_KEY, [])
     booking_ids.append(str(reservation.booking_id))
     request.session.modified = True
 
+    confirmation_url = reverse("reservation-confirmation", args=[reservation.id])
     if request.htmx:
-        return render(request, "cinema/_seat.html", {"seat": seat})
+        return HttpResponseClientRedirect(confirmation_url)
 
-    messages.success(
-        request, f"Seat {reservation.seat.row}{reservation.seat.number} reserved."
-    )
-    return redirect("reservation-confirmation", reservation_id=reservation.id)
+    messages.success(request, f"Seat {seat.row}{seat.number} reserved.")
+    return redirect(confirmation_url)
 
 
 def reservation_confirmation(request, reservation_id):

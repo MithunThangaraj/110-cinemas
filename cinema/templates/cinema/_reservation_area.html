@@ -1,0 +1,49 @@
+<form
+    class="reservation"
+    method="post"
+    action="{% url 'reserve-seats' screening.id %}"
+    hx-post="{% url 'reserve-seats' screening.id %}"
+    hx-target="this"
+    hx-swap="outerHTML"
+>
+    {% csrf_token %}
+
+    <div class="theater">
+        <p class="screen" aria-hidden="true">Screen</p>
+
+        <fieldset class="seat-grid">
+            <legend class="visually-hidden">Choose a seat</legend>
+            {% regroup seats by row as seat_rows %}
+            {% for row in seat_rows %}
+            <div class="seat-row">
+                <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
+                <div class="seat-row__seats">
+                    {% for seat in row.list %}
+                    {% include "cinema/_seat.html" %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </fieldset>
+
+        <ul class="seat-legend">
+            <li><span class="seat seat--legend"></span> Available</li>
+            <li><span class="seat seat--legend seat--legend-selected"></span> Selecting</li>
+            <li><span class="seat seat--legend seat--reserved"></span> Reserved</li>
+        </ul>
+    </div>
+
+    <div class="checkout">
+        {% if seat_error %}
+        <p class="checkout__error" role="alert">{{ seat_error }}</p>
+        {% endif %}
+        {% for field in form %}
+        <div class="form-field">
+            {{ field.label_tag }}
+            {{ field }}
+            {{ field.errors }}
+        </div>
+        {% endfor %}
+        <button type="submit">Reserve seat</button>
+    </div>
+</form>

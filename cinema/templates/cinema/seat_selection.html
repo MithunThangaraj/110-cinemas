@@ -5,28 +5,5 @@
 {% block content %}
 <h2>{{ screening.movie.title }} - {{ screening.venue }} ({{ screening.start_time }})</h2>
 
-<div class="theater">
-    <div class="screen"><span>Screen</span></div>
-
-    <fieldset class="seat-grid">
-        <legend class="visually-hidden">Select a seat</legend>
-        {% regroup seats by row as seat_rows %}
-        {% for row in seat_rows %}
-        <div class="seat-row">
-            <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
-            <ul class="seat-row__seats">
-                {% for seat in row.list %}
-                {% include "cinema/_seat.html" %}
-                {% endfor %}
-            </ul>
-        </div>
-        {% endfor %}
-    </fieldset>
-
-    <ul class="seat-legend">
-        <li><span class="seat-icon seat-icon--available seat-icon--sample"></span> Available</li>
-        <li><span class="seat-icon seat-icon--selected seat-icon--sample"></span> Selecting</li>
-        <li><span class="seat-icon seat-icon--reserved seat-icon--sample"></span> Reserved</li>
-    </ul>
-</div>
+{% include "cinema/_reservation_area.html" %}
 {% endblock %}
