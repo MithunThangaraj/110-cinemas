@@ -15,11 +15,15 @@ The system SHALL store individual seats for each screening, identified by row la
 - **THEN** each seat SHALL indicate whether it is available or reserved
 
 ### Requirement: Reservation data model
-The system SHALL store reservations linking a seat to a screening with a status (confirmed or cancelled), a unique booking identifier, and a timestamp.
+The system SHALL store reservations linking a seat to a screening with a status (confirmed or cancelled), a unique booking identifier, a timestamp, and the booking customer's name and email.
 
 #### Scenario: Create a reservation
 - **WHEN** a user reserves seat A1 for "Dune: Part Three" screening on 2027-11-01 at 19:00
-- **THEN** a reservation record is created with status "confirmed" and a unique booking ID
+- **THEN** a reservation record is created with status "confirmed", a unique booking ID, and the customer's name and email
+
+#### Scenario: Reservation captures customer details
+- **WHEN** a reservation is created through the reservation form
+- **THEN** the reservation SHALL store the submitted customer name and email
 
 #### Scenario: Cancel a reservation
 - **WHEN** a user cancels reservation for seat A1

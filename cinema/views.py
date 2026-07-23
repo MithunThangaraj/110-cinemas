@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 
+from .forms import MovieSearchForm, ReservationForm
 from .models import Movie, Reservation, Screening, Seat
 from .services import reserve_seat
 
@@ -15,8 +16,11 @@ def index(request):
 
 
 def movie_list(request):
+    form = MovieSearchForm(request.GET)
     movies = Movie.objects.all()
-    return render(request, "cinema/movie_list.html", {"movies": movies})
+    if form.is_valid() and form.cleaned_data["q"]:
+        movies = movies.filter(title__icontains=form.cleaned_data["q"])
+    return render(request, "cinema/movie_list.html", {"movies": movies, "form": form})
 
 
 def seat_selection(request, screening_id):
@@ -29,11 +33,33 @@ def seat_selection(request, screening_id):
     )
 
 
+def _render_reservation_form(request, seat, form):
+    if request.htmx:
+        return render(
+            request, "cinema/_seat_reserve_form.html", {"seat": seat, "form": form}
+        )
+    return render(request, "cinema/reservation_form.html", {"seat": seat, "form": form})
+
+
 def reserve_seat_view(request, seat_id):
+    seat = get_object_or_404(Seat, pk=seat_id)
+
+    if request.method != "POST":
+        return _render_reservation_form(request, seat, ReservationForm())
+
+    form = ReservationForm(request.POST)
+    if not form.is_valid():
+        return _render_reservation_form(request, seat, form)
+
     try:
-        reservation = reserve_seat(seat_id)
+        reservation = reserve_seat(
+            seat_id,
+            customer_name=form.cleaned_data["customer_name"],
+            customer_email=form.cleaned_data["customer_email"],
+        )
     except ValidationError:
-        seat = get_object_or_404(Seat, pk=seat_id)
+        if request.htmx:
+            return render(request, "cinema/_seat.html", {"seat": seat})
         messages.error(
             request, "That seat was already reserved. Please pick another one."
         )
@@ -42,6 +68,9 @@ def reserve_seat_view(request, seat_id):
     booking_ids = request.session.setdefault(SESSION_BOOKINGS_KEY, [])
     booking_ids.append(str(reservation.booking_id))
     request.session.modified = True
+
+    if request.htmx:
+        return render(request, "cinema/_seat.html", {"seat": seat})
 
     messages.success(
         request, f"Seat {reservation.seat.row}{reservation.seat.number} reserved."

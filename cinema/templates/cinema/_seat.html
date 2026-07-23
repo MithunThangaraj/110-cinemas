@@ -1,12 +1,18 @@
-<li>
-    {{ seat.row }}{{ seat.number }} -
+<li class="seat {% if seat.is_available %}seat--available{% else %}seat--reserved{% endif %}">
     {% if seat.is_available %}
-    available
-    <form method="post" action="{% url 'reserve-seat' seat.id %}">
-        {% csrf_token %}
-        <button type="submit">Reserve</button>
-    </form>
+    <a
+        href="{% url 'reserve-seat' seat.id %}"
+        hx-get="{% url 'reserve-seat' seat.id %}"
+        hx-target="closest li"
+        hx-swap="outerHTML"
+    >
+        {{ seat.row }}{{ seat.number }}
+        <span class="visually-hidden">(available)</span>
+    </a>
     {% else %}
-    reserved
+    <span>
+        {{ seat.row }}{{ seat.number }}
+        <span class="visually-hidden">(reserved)</span>
+    </span>
     {% endif %}
 </li>

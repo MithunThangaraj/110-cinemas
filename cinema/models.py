@@ -80,6 +80,8 @@ class Reservation(models.Model):
         Seat, on_delete=models.CASCADE, related_name="reservations"
     )
     booking_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    customer_name = models.CharField(max_length=255, blank=True, default="")
+    customer_email = models.EmailField(blank=True, default="")
     status = models.CharField(
         max_length=10,
         choices=[("confirmed", "Confirmed"), ("cancelled", "Cancelled")],

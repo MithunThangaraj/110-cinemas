@@ -6,4 +6,7 @@
 <h2>Reservation {{ reservation.status }}</h2>
 <p>Booking ID: {{ reservation.booking_id }}</p>
 <p>Seat: {{ reservation.seat }}</p>
+{% if reservation.customer_name %}
+<p>Booked by: {{ reservation.customer_name }} ({{ reservation.customer_email }})</p>
+{% endif %}
 {% endblock %}

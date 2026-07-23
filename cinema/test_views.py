@@ -3,6 +3,11 @@ from django.urls import reverse
 
 from .services import reserve_seat
 
+VALID_RESERVATION = {
+    "customer_name": "Ada Lovelace",
+    "customer_email": "ada@example.com",
+}
+
 
 @pytest.mark.django_db
 class TestIndex:
@@ -19,6 +24,12 @@ class TestMovieList:
         assert response.status_code == 200
         assert movie.title.encode() in response.content
 
+    def test_movie_search_filters_by_title(self, client, movie):
+        matching = client.get(reverse("movie-list"), {"q": "dune"})
+        assert movie.title.encode() in matching.content
+        missing = client.get(reverse("movie-list"), {"q": "nope"})
+        assert movie.title.encode() not in missing.content
+
 
 @pytest.mark.django_db
 class TestSeatSelection:
@@ -34,15 +45,26 @@ class TestSeatSelection:
 
 @pytest.mark.django_db
 class TestReserveSeatView:
+    def test_get_renders_reservation_form(self, client, future_screening):
+        seat = future_screening.seats.first()
+        response = client.get(reverse("reserve-seat", args=[seat.id]))
+        assert response.status_code == 200
+        assert b"customer_name" in response.content
+        assert b"customer_email" in response.content
+
     def test_reserve_available_seat_redirects_to_confirmation(
         self, client, future_screening
     ):
         seat = future_screening.seats.first()
-        response = client.post(reverse("reserve-seat", args=[seat.id]))
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]), VALID_RESERVATION
+        )
         seat.refresh_from_db()
         assert response.status_code == 302
         assert seat.is_available is False
         reservation = seat.reservations.get(status="confirmed")
+        assert reservation.customer_name == "Ada Lovelace"
+        assert reservation.customer_email == "ada@example.com"
         assert response.url == reverse(
             "reservation-confirmation", args=[reservation.id]
         )
@@ -51,16 +73,40 @@ class TestReserveSeatView:
         self, client, future_screening
     ):
         seat = future_screening.seats.first()
-        client.post(reverse("reserve-seat", args=[seat.id]))
+        client.post(reverse("reserve-seat", args=[seat.id]), VALID_RESERVATION)
         reservation = seat.reservations.get(status="confirmed")
         assert str(reservation.booking_id) in client.session["booking_ids"]
+
+    def test_reserve_with_invalid_email_re_renders_form_without_booking(
+        self, client, future_screening
+    ):
+        seat = future_screening.seats.first()
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]),
+            {"customer_name": "Ada", "customer_email": "not-an-email"},
+        )
+        assert response.status_code == 200
+        assert seat.reservations.filter(status="confirmed").count() == 0
+
+    def test_reserve_missing_name_re_renders_form_without_booking(
+        self, client, future_screening
+    ):
+        seat = future_screening.seats.first()
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]),
+            {"customer_name": "", "customer_email": "ada@example.com"},
+        )
+        assert response.status_code == 200
+        assert seat.reservations.filter(status="confirmed").count() == 0
 
     def test_reserve_already_reserved_seat_redirects_to_seat_selection(
         self, client, future_screening
     ):
         seat = future_screening.seats.first()
         reserve_seat(seat.id)
-        response = client.post(reverse("reserve-seat", args=[seat.id]))
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]), VALID_RESERVATION
+        )
         assert response.status_code == 302
         assert response.url == reverse("seat-selection", args=[future_screening.id])
 
@@ -69,8 +115,66 @@ class TestReserveSeatView:
     ):
         seat = future_screening.seats.first()
         reserve_seat(seat.id)
-        response = client.post(reverse("reserve-seat", args=[seat.id]), follow=True)
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]), VALID_RESERVATION, follow=True
+        )
         assert b"already reserved" in response.content
+
+
+@pytest.mark.django_db
+class TestReserveSeatViewHtmx:
+    def test_htmx_get_renders_seat_form_fragment(self, client, future_screening):
+        seat = future_screening.seats.first()
+        response = client.get(
+            reverse("reserve-seat", args=[seat.id]), HTTP_HX_REQUEST="true"
+        )
+        assert response.status_code == 200
+        assert b"customer_name" in response.content
+        assert b"<html" not in response.content
+
+    def test_htmx_reserve_available_seat_returns_reserved_seat_fragment(
+        self, client, future_screening
+    ):
+        seat = future_screening.seats.first()
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]),
+            VALID_RESERVATION,
+            HTTP_HX_REQUEST="true",
+        )
+        seat.refresh_from_db()
+        assert response.status_code == 200
+        assert seat.is_available is False
+        assert b"<html" not in response.content
+        assert f"{seat.row}{seat.number}".encode() in response.content
+        reservation = seat.reservations.get(status="confirmed")
+        assert str(reservation.booking_id) in client.session["booking_ids"]
+
+    def test_htmx_reserve_with_invalid_email_returns_form_fragment_with_errors(
+        self, client, future_screening
+    ):
+        seat = future_screening.seats.first()
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]),
+            {"customer_name": "Ada", "customer_email": "not-an-email"},
+            HTTP_HX_REQUEST="true",
+        )
+        assert response.status_code == 200
+        assert seat.reservations.filter(status="confirmed").count() == 0
+        assert b"customer_email" in response.content
+
+    def test_htmx_reserve_already_reserved_seat_returns_reserved_fragment(
+        self, client, future_screening
+    ):
+        seat = future_screening.seats.first()
+        reserve_seat(seat.id)
+        response = client.post(
+            reverse("reserve-seat", args=[seat.id]),
+            VALID_RESERVATION,
+            HTTP_HX_REQUEST="true",
+        )
+        assert response.status_code == 200
+        assert seat.reservations.filter(status="confirmed").count() == 1
+        assert f"{seat.row}{seat.number}".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -91,7 +195,7 @@ class TestMyBookings:
         self, client, future_screening
     ):
         seat = future_screening.seats.first()
-        client.post(reverse("reserve-seat", args=[seat.id]))
+        client.post(reverse("reserve-seat", args=[seat.id]), VALID_RESERVATION)
         response = client.get(reverse("my-bookings"))
         assert response.status_code == 200
         assert f"{seat.row}{seat.number}".encode() in response.content

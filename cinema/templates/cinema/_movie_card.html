@@ -1,6 +1,14 @@
-<li>
-    <strong>{{ movie.title }}</strong> ({{ movie.release_date }})
-    <ul>
+<li class="movie-card">
+    {% if movie.poster_image %}
+    <img
+        class="movie-card__poster"
+        src="{{ movie.poster_image }}"
+        alt="Poster for {{ movie.title }}"
+    >
+    {% endif %}
+    <h3>{{ movie.title }}</h3>
+    <p>{{ movie.release_date }}</p>
+    <ul class="screening-list">
         {% for screening in movie.screenings.all %}
         <li>
             <a href="{% url 'seat-selection' screening.id %}">
