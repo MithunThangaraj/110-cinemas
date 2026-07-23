@@ -1,28 +1,39 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}110 Cinemas{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'cinema/css/styles.css' %}">
 </head>
 <body>
-    <header>
-        <h1><a href="{% url 'movie-list' %}">110 Cinemas</a></h1>
-        <nav>
-            <a href="{% url 'movie-list' %}">Movies</a>
-            <a href="{% url 'my-bookings' %}">My Bookings</a>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <header class="site-header">
+        <h1 class="site-title"><a href="{% url 'movie-list' %}">110 Cinemas</a></h1>
+        <nav class="site-nav" aria-label="Main">
+            <ul>
+                <li><a href="{% url 'movie-list' %}">Movies</a></li>
+                <li><a href="{% url 'my-bookings' %}">My Bookings</a></li>
+            </ul>
         </nav>
     </header>
 
-    {% if messages %}
-    <ul class="messages">
-        {% for message in messages %}
-        <li class="{{ message.tags }}">{{ message }}</li>
-        {% endfor %}
-    </ul>
-    {% endif %}
+    <main id="main-content" class="site-main">
+        {% if messages %}
+        <ul class="messages" aria-live="polite">
+            {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
 
-    <main>
         {% block content %}{% endblock %}
     </main>
+
+    <footer class="site-footer">
+        <p>110 Cinemas &mdash; a course project for browsing movies and reserving seats.</p>
+    </footer>
 </body>
 </html>

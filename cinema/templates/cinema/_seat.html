@@ -1,8 +1,13 @@
-<li>
-    {{ seat.row }}{{ seat.number }} -
+<li class="seat {% if seat.is_available %}seat--available{% else %}seat--reserved{% endif %}">
     {% if seat.is_available %}
-    available - <a href="{% url 'reserve-seat' seat.id %}">Reserve</a>
+    <a href="{% url 'reserve-seat' seat.id %}">
+        {{ seat.row }}{{ seat.number }}
+        <span class="visually-hidden">(available)</span>
+    </a>
     {% else %}
-    reserved
+    <span>
+        {{ seat.row }}{{ seat.number }}
+        <span class="visually-hidden">(reserved)</span>
+    </span>
     {% endif %}
 </li>
