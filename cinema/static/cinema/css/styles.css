@@ -201,6 +201,20 @@ textarea:focus {
   text-decoration: none;
 }
 
+.seat--form {
+  grid-column: span 2;
+  text-align: left;
+}
+
+.seat__label {
+  margin: 0 0 var(--space-1);
+  font-weight: bold;
+}
+
+.form-field--compact input {
+  max-width: 100%;
+}
+
 .form-field {
   margin-bottom: var(--space-2);
 }
