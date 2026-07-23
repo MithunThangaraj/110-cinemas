@@ -33,20 +33,23 @@ def seat_selection(request, screening_id):
     )
 
 
+def _render_reservation_form(request, seat, form):
+    if request.htmx:
+        return render(
+            request, "cinema/_seat_reserve_form.html", {"seat": seat, "form": form}
+        )
+    return render(request, "cinema/reservation_form.html", {"seat": seat, "form": form})
+
+
 def reserve_seat_view(request, seat_id):
     seat = get_object_or_404(Seat, pk=seat_id)
 
     if request.method != "POST":
-        form = ReservationForm()
-        return render(
-            request, "cinema/reservation_form.html", {"seat": seat, "form": form}
-        )
+        return _render_reservation_form(request, seat, ReservationForm())
 
     form = ReservationForm(request.POST)
     if not form.is_valid():
-        return render(
-            request, "cinema/reservation_form.html", {"seat": seat, "form": form}
-        )
+        return _render_reservation_form(request, seat, form)
 
     try:
         reservation = reserve_seat(
@@ -55,6 +58,8 @@ def reserve_seat_view(request, seat_id):
             customer_email=form.cleaned_data["customer_email"],
         )
     except ValidationError:
+        if request.htmx:
+            return render(request, "cinema/_seat.html", {"seat": seat})
         messages.error(
             request, "That seat was already reserved. Please pick another one."
         )
@@ -63,6 +68,9 @@ def reserve_seat_view(request, seat_id):
     booking_ids = request.session.setdefault(SESSION_BOOKINGS_KEY, [])
     booking_ids.append(str(reservation.booking_id))
     request.session.modified = True
+
+    if request.htmx:
+        return render(request, "cinema/_seat.html", {"seat": seat})
 
     messages.success(
         request, f"Seat {reservation.seat.row}{reservation.seat.number} reserved."
