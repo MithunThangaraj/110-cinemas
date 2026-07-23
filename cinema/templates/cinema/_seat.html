@@ -1,6 +1,7 @@
-<li class="seat {% if seat.is_available %}seat--available{% else %}seat--reserved{% endif %}">
+<li class="seat-cell">
     {% if seat.is_available %}
     <a
+        class="seat-icon seat-icon--available"
         href="{% url 'reserve-seat' seat.id %}"
         hx-get="{% url 'reserve-seat' seat.id %}"
         hx-target="closest li"
@@ -10,7 +11,7 @@
         <span class="visually-hidden">(available)</span>
     </a>
     {% else %}
-    <span>
+    <span class="seat-icon seat-icon--reserved">
         {{ seat.row }}{{ seat.number }}
         <span class="visually-hidden">(reserved)</span>
     </span>
