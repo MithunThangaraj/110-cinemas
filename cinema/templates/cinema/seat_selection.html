@@ -5,12 +5,5 @@
 {% block content %}
 <h2>{{ screening.movie.title }} - {{ screening.venue }} ({{ screening.start_time }})</h2>
 
-<fieldset class="seat-grid">
-    <legend>Select a seat</legend>
-    <ul class="seat-grid__seats">
-        {% for seat in seats %}
-        {% include "cinema/_seat.html" %}
-        {% endfor %}
-    </ul>
-</fieldset>
+{% include "cinema/_reservation_area.html" %}
 {% endblock %}

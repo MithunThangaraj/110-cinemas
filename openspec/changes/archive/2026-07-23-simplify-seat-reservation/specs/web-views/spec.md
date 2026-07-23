@@ -1,32 +1,4 @@
-# web-views Specification
-
-## Purpose
-TBD - created by archiving change write-view-functions. Update Purpose after archive.
-## Requirements
-### Requirement: Home redirect
-The system SHALL expose `GET /` (name: `index`) that takes no arguments and
-redirects (HTTP 302) to the movie list page.
-
-#### Scenario: Visiting the root URL
-- **WHEN** a browser sends `GET /`
-- **THEN** the response SHALL be a redirect to the URL named `movie-list`
-
-### Requirement: Movie list page
-The system SHALL expose `GET /movies/` (name: `movie-list`) that returns an HTML
-page listing movies (title and release date) and a search form. It SHALL accept
-an optional `q` query parameter (a title search) submitted via a **GET** form;
-when `q` is provided, the list SHALL be filtered to movies whose title contains
-`q` (case-insensitive).
-
-#### Scenario: Listing movies
-- **WHEN** a browser sends `GET /movies/`
-- **THEN** the response SHALL be HTTP 200 with an HTML page containing the title
-  of every `Movie` in the database
-
-#### Scenario: Searching movies by title
-- **WHEN** a browser sends `GET /movies/?q=<term>`
-- **THEN** the response SHALL be HTTP 200 listing only movies whose title
-  contains `<term>` (case-insensitive)
+## MODIFIED Requirements
 
 ### Requirement: Seat selection page
 The system SHALL expose `GET /screenings/<screening_id>/seats/`
@@ -106,33 +78,3 @@ Behavior depends on whether the request carries the `HX-Request` header:
 - **THEN** no new reservation SHALL be created and the response SHALL show an
   error telling the visitor to choose another seat, with the seat map reflecting
   that the seat is now reserved
-
-### Requirement: Reservation confirmation page
-The system SHALL expose `GET /reservations/<reservation_id>/`
-(name: `reservation-confirmation`) taking a `reservation_id` (integer, path
-parameter) and returning an HTML page showing that reservation's booking ID,
-seat, and status.
-
-#### Scenario: Viewing a confirmation for an existing reservation
-- **WHEN** a browser sends `GET /reservations/<reservation_id>/` for a
-  reservation that exists
-- **THEN** the response SHALL be HTTP 200 with an HTML page showing the
-  reservation's booking ID, seat, and status
-
-### Requirement: My bookings page
-The system SHALL expose `GET /my-bookings/` (name: `my-bookings`) that takes no
-arguments and returns an HTML page listing the reservations whose booking IDs
-are stored in the current session, each linking to its confirmation page. This
-lets a visitor review the seats they reserved during the current visit without
-an account.
-
-#### Scenario: Viewing bookings made this session
-- **WHEN** a browser sends `GET /my-bookings/` after reserving one or more seats
-  in the same session
-- **THEN** the response SHALL be HTTP 200 with an HTML page listing those seats
-
-#### Scenario: Viewing bookings with an empty session
-- **WHEN** a browser sends `GET /my-bookings/` without having reserved any seat
-- **THEN** the response SHALL be HTTP 200 with an HTML page indicating there are
-  no bookings yet
-
