@@ -1,18 +1,20 @@
-<li class="seat seat--available seat--form">
-    <p class="seat__label">{{ seat.row }}{{ seat.number }}</p>
-    <form
-        hx-post="{% url 'reserve-seat' seat.id %}"
-        hx-target="closest li"
-        hx-swap="outerHTML"
-    >
-        {% csrf_token %}
-        {% for field in form %}
-        <div class="form-field form-field--compact">
-            {{ field.label_tag }}
-            {{ field }}
-            {{ field.errors }}
-        </div>
-        {% endfor %}
-        <button type="submit">Confirm</button>
-    </form>
+<li class="seat-cell seat-cell--form">
+    <div class="seat-icon seat-icon--selected">
+        <p class="seat__label">{{ seat.row }}{{ seat.number }}</p>
+        <form
+            hx-post="{% url 'reserve-seat' seat.id %}"
+            hx-target="closest li"
+            hx-swap="outerHTML"
+        >
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="form-field form-field--compact">
+                {{ field.label_tag }}
+                {{ field }}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+            <button type="submit">Confirm</button>
+        </form>
+    </div>
 </li>
