@@ -1,19 +1,18 @@
-<li class="seat-cell">
-    {% if seat.is_available %}
-    <a
-        class="seat-icon seat-icon--available"
-        href="{% url 'reserve-seat' seat.id %}"
-        hx-get="{% url 'reserve-seat' seat.id %}"
-        hx-target="closest li"
-        hx-swap="outerHTML"
+{% if seat.is_available %}
+<label class="seat seat--available">
+    <input
+        type="radio"
+        name="seat"
+        value="{{ seat.id }}"
+        class="visually-hidden"
+        aria-label="Seat {{ seat.row }}{{ seat.number }}, available"
+        {% if selected_seat_id == seat.id %}checked{% endif %}
     >
-        {{ seat.row }}{{ seat.number }}
-        <span class="visually-hidden">(available)</span>
-    </a>
-    {% else %}
-    <span class="seat-icon seat-icon--reserved">
-        {{ seat.row }}{{ seat.number }}
-        <span class="visually-hidden">(reserved)</span>
-    </span>
-    {% endif %}
-</li>
+    <span class="seat__code" aria-hidden="true">{{ seat.row }}{{ seat.number }}</span>
+</label>
+{% else %}
+<span class="seat seat--reserved">
+    <span class="seat__code" aria-hidden="true">{{ seat.row }}{{ seat.number }}</span>
+    <span class="visually-hidden">Seat {{ seat.row }}{{ seat.number }}, reserved</span>
+</span>
+{% endif %}
