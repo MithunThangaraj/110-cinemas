@@ -82,12 +82,41 @@ The repo includes `render.yaml` (service blueprint) and `build.sh` (build step).
 1. Push the repository to GitHub.
 2. On https://render.com, create a new **Blueprint** and point it at this repo;
    render reads `render.yaml`.
-3. render runs `build.sh` (installs dependencies, runs `collectstatic` and
-   `migrate`) and then starts the app with:
-   `uv run waitress-serve --port=$PORT cinema.wsgi:application`.
+3. render runs `build.sh` (installs dependencies, runs `collectstatic`,
+   `migrate`, and seeds demo data) and then starts the app with waitress.
 4. `DJANGO_DEBUG=False` and a generated `DJANGO_SECRET_KEY` are set by
    `render.yaml`; `RENDER_EXTERNAL_HOSTNAME` is provided by render and is
    automatically trusted for hosts and CSRF, and enables HTTPS hardening.
+
+**Why the start command passes `--trusted-proxy`:** waitress defaults to
+`clear_untrusted_proxy_headers=True`, which strips render's `X-Forwarded-Proto`
+header. Django would then treat HTTPS requests as insecure and
+`SECURE_SSL_REDIRECT` would redirect `https -> https` forever. Trusting the
+proxy for that one header fixes it:
+
+```
+uv run waitress-serve --port=$PORT --trusted-proxy='*' \
+  --trusted-proxy-headers=x-forwarded-proto cinema.wsgi:application
+```
+
+### Demo data and the admin user on render
+
+Because render's free tier starts with an empty database on every deploy,
+`build.sh` runs `manage.py seed_demo_data`, which creates a few movies and
+future screenings (with their seats) only if no movies exist yet. Run it
+locally the same way:
+
+```bash
+uv run python manage.py seed_demo_data
+```
+
+To also get an admin login on the deployed site, add these as environment
+variables in the render dashboard (choose your own password; it is never stored
+in the repo). `build.sh` creates the superuser only when they are present:
+
+- `DJANGO_SUPERUSER_USERNAME`
+- `DJANGO_SUPERUSER_EMAIL`
+- `DJANGO_SUPERUSER_PASSWORD`
 
 > **Note on the database:** render's free tier has an ephemeral filesystem, so
 > the SQLite database resets on each deploy/restart. That is fine for a demo.

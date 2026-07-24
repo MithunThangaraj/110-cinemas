@@ -6,7 +6,11 @@ services:
     runtime: python
     plan: free
     buildCommand: "./build.sh"
-    startCommand: "uv run waitress-serve --port=$PORT cinema.wsgi:application"
+    # --trusted-proxy/--trusted-proxy-headers are required: waitress defaults to
+    # clear_untrusted_proxy_headers=True and would otherwise strip render's
+    # X-Forwarded-Proto, so Django would think HTTPS requests were insecure and
+    # SECURE_SSL_REDIRECT would redirect https -> https forever.
+    startCommand: "uv run waitress-serve --port=$PORT --trusted-proxy='*' --trusted-proxy-headers=x-forwarded-proto cinema.wsgi:application"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"
