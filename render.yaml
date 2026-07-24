@@ -1,0 +1,16 @@
+# render.com blueprint for the 110 Cinemas Django app.
+# See https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: 110-cinemas
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "uv run waitress-serve --port=$PORT cinema.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
