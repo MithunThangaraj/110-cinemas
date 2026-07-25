@@ -40,4 +40,9 @@ urlpatterns = [
         views.booking_confirmation,
         name="booking-confirmation",
     ),
+    path(
+        "bookings/<uuid:group_id>/cancel/",
+        views.cancel_booking_view,
+        name="cancel-booking",
+    ),
 ]

@@ -40,6 +40,12 @@ reserved all-or-nothing: if any one of them is taken in the meantime, none are
 booked. The limit lives in `cinema/services.py` as `MAX_SEATS_PER_BOOKING` and
 is enforced on the server; the browser only mirrors it.
 
+A booking can be cancelled from the ticket or from **My Bookings**, which puts
+every seat in it back on sale. Because there are no accounts, a booking belongs
+to the browser session that made it: cancelling requires the booking's group ID
+to be in that session, so a leaked booking link cannot be used to release
+someone else's seats.
+
 ## Posters
 
 Posters come from Apple's **iTunes Search API**, which is free and needs no API

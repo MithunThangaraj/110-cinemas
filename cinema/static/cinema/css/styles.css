@@ -374,6 +374,20 @@ button:hover,
   filter: none;
 }
 
+.button--danger {
+  background: transparent;
+  border: 1px solid var(--err-line);
+  color: var(--err-text);
+  box-shadow: none;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.9rem;
+}
+
+.button--danger:hover {
+  background: var(--err-bg);
+  filter: none;
+}
+
 /* ==========================================================================
    Movie grid
    ========================================================================== */
@@ -1023,6 +1037,32 @@ button:hover,
   margin-top: var(--space-3);
 }
 
+.confirmation__badge--cancelled {
+  border-color: var(--err-line);
+  background: var(--err-bg);
+  color: var(--err-text);
+}
+
+.ticket--cancelled {
+  opacity: 0.6;
+}
+
+.ticket--cancelled .ticket__stub {
+  background: linear-gradient(160deg, #4a4a5c, #2c2c3d);
+}
+
+.confirmation__cancel {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.confirmation__cancel-note {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 /* ==========================================================================
    My bookings
    ========================================================================== */
@@ -1033,6 +1073,17 @@ button:hover,
   padding: 0;
   display: grid;
   gap: var(--space-2);
+}
+
+.booking-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.booking-row .booking {
+  flex: 1 1 20rem;
 }
 
 .booking {

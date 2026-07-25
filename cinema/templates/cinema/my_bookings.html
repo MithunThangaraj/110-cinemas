@@ -8,7 +8,7 @@
 
 <ul class="booking-list">
     {% for booking in bookings %}
-    <li>
+    <li class="booking-row">
         <a class="booking" href="{% url 'booking-confirmation' booking.group_id %}">
             <span class="booking__seats">
                 {% for seat in booking.seats %}<span class="booking__seat">{{ seat.row }}{{ seat.number }}</span>{% endfor %}
@@ -24,6 +24,9 @@
                 {{ booking.status }}
             </span>
         </a>
+        {% if booking.status == "confirmed" %}
+        {% include "cinema/_cancel_form.html" with group_id=booking.group_id %}
+        {% endif %}
     </li>
     {% empty %}
     <li class="empty-state">
