@@ -5,6 +5,9 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+# Number of colour schemes available for generated poster art.
+POSTER_THEMES = 6
+
 
 class Movie(models.Model):
     title = models.CharField(max_length=255)
@@ -18,6 +21,17 @@ class Movie(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def poster_theme(self):
+        """Colour scheme (1..POSTER_THEMES) for the generated poster art.
+
+        Movies without a `poster_image` are shown as a coloured key-art card
+        instead of a broken image. The colour is derived from the title so it
+        stays the same across deploys, unlike one derived from the primary key
+        (which changes whenever the demo data is reseeded).
+        """
+        return sum(ord(char) for char in self.title) % POSTER_THEMES + 1
 
 
 class Screening(models.Model):

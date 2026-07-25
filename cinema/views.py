@@ -66,6 +66,7 @@ def reserve_seats(request, screening_id):
         "screening": screening,
         "seats": screening.seats.all(),
         "form": form,
+        "selected_seat": seat,
         "selected_seat_id": seat.id if seat else None,
     }
 
@@ -81,6 +82,7 @@ def reserve_seats(request, screening_id):
             customer_email=form.cleaned_data["customer_email"],
         )
     except ValidationError:
+        context["selected_seat"] = None
         context["selected_seat_id"] = None
         context["seat_error"] = "That seat was just taken. Please choose another one."
         return _render_reservation_area(request, context)

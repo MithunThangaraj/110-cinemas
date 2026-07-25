@@ -1,0 +1,17 @@
+{% comment %}
+Renders a movie poster. Real film posters are copyrighted, so a movie without a
+`poster_image` URL falls back to generated key-art instead of a broken image.
+{% endcomment %}
+{% if movie.poster_image %}
+<img
+    class="poster poster--photo"
+    src="{{ movie.poster_image }}"
+    alt="Poster for {{ movie.title }}"
+    loading="lazy"
+>
+{% else %}
+<span class="poster poster--art poster--t{{ movie.poster_theme }}" aria-hidden="true">
+    <span class="poster__initial">{{ movie.title|first }}</span>
+    <span class="poster__label">{{ movie.title }}</span>
+</span>
+{% endif %}

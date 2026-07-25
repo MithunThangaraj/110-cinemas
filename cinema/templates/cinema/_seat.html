@@ -5,14 +5,15 @@
         name="seat"
         value="{{ seat.id }}"
         class="visually-hidden"
+        data-code="{{ seat.row }}{{ seat.number }}"
         aria-label="Seat {{ seat.row }}{{ seat.number }}, available"
         {% if selected_seat_id == seat.id %}checked{% endif %}
     >
-    <span class="seat__code" aria-hidden="true">{{ seat.row }}{{ seat.number }}</span>
+    <span class="seat__code" aria-hidden="true">{{ seat.number }}</span>
 </label>
 {% else %}
 <span class="seat seat--reserved">
-    <span class="seat__code" aria-hidden="true">{{ seat.row }}{{ seat.number }}</span>
+    <span class="seat__code" aria-hidden="true">{{ seat.number }}</span>
     <span class="visually-hidden">Seat {{ seat.row }}{{ seat.number }}, reserved</span>
 </span>
 {% endif %}

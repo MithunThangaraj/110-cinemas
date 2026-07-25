@@ -27,6 +27,14 @@ uv run python manage.py createsuperuser
 and add a Movie and a Screening at http://localhost:8000/admin/ (seats are
 generated automatically when a screening is saved).
 
+## Posters
+
+`Movie.poster_image` is an optional URL. Real film posters are copyrighted and
+no free API serves them reliably, so a movie without a poster URL is rendered
+as generated key-art instead of a broken image: a coloured card whose palette
+is derived from the title (`Movie.poster_theme`). Set `poster_image` in the
+admin to show a real poster instead.
+
 ## Run Linter
 ```bash
 uv run pylint cinema

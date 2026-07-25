@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
-from .models import Movie, Reservation, Screening, Seat
+from .models import POSTER_THEMES, Movie, Reservation, Screening, Seat
 from .services import cancel_reservation, reserve_seat
 
 
@@ -20,6 +20,18 @@ class TestMovie:
         )
         assert movie.title == "Test Movie"
         assert str(movie) == "Test Movie"
+
+    def test_poster_theme_is_in_range_and_stable(self):
+        movie = Movie(title="Test Movie", release_date=date(2026, 1, 1))
+        assert 1 <= movie.poster_theme <= POSTER_THEMES
+        assert movie.poster_theme == Movie(title="Test Movie").poster_theme
+
+    def test_poster_theme_differs_between_titles(self):
+        # Not a guarantee for every pair, but the listing should not be a
+        # single flat colour for these demo-style titles.
+        titles = ["Dune", "Spirited Away", "Neon Harbour", "Paper Moons"]
+        themes = {Movie(title=title).poster_theme for title in titles}
+        assert len(themes) > 1
 
     def test_movie_ordering(self):
         Movie.objects.create(
