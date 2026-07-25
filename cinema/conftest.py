@@ -1,9 +1,19 @@
 from datetime import date, timedelta
 
 import pytest
+from django.test import Client
 from django.utils import timezone
 
 from .models import Movie, Screening
+
+
+@pytest.fixture
+def django_client_factory():
+    """Build extra clients, each with its own session.
+
+    Used to check that one visitor cannot act on another visitor's booking.
+    """
+    return Client
 
 
 @pytest.fixture

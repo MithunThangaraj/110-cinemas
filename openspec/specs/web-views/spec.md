@@ -116,7 +116,9 @@ Behavior depends on whether the request carries the `HX-Request` header:
 The system SHALL expose `GET /bookings/<group_id>/`
 (name: `booking-confirmation`) taking a `group_id` (UUID, path parameter) and
 returning an HTML page showing the booking's seats, screening, total price, and
-booking reference.
+booking reference. When the booking is still confirmed and was made in the
+current session, the page SHALL also offer to cancel it; a cancelled booking
+SHALL be shown as cancelled instead.
 
 #### Scenario: Viewing a confirmation for an existing booking
 - **WHEN** a browser sends `GET /bookings/<group_id>/` for a booking that exists
@@ -128,12 +130,53 @@ booking reference.
   reservations
 - **THEN** the response SHALL be HTTP 404
 
+### Requirement: Cancel booking action
+The system SHALL expose `POST /bookings/<group_id>/cancel/`
+(name: `cancel-booking`) taking a `group_id` (UUID, path parameter). It SHALL
+cancel every confirmed reservation in that booking, making the seats available
+again.
+
+The action SHALL only accept POST: a GET SHALL NOT change any state, because a
+browser or crawler prefetching a link would otherwise cancel bookings.
+
+**Access control:** only the session that made the booking may cancel it.
+Booking references are UUIDs in the URL, so a request whose session does not
+hold the group ID SHALL receive HTTP 404 (not 403, so that valid booking
+references cannot be probed).
+
+On success it SHALL add a success flash message and redirect (HTTP 302) to the
+my-bookings page, or return an `HX-Redirect` to it for HTMX requests. If the
+booking is already cancelled it SHALL add an error message instead and create
+no change.
+
+#### Scenario: Cancelling a booking made in this session
+- **WHEN** a browser sends `POST /bookings/<group_id>/cancel/` for a confirmed
+  booking whose group ID is in its session
+- **THEN** every reservation in that booking SHALL become "cancelled", every
+  seat SHALL become available for booking again, and the response SHALL
+  redirect to the my-bookings page
+
+#### Scenario: Cancelling another visitor's booking
+- **WHEN** a browser sends `POST /bookings/<group_id>/cancel/` for a booking
+  whose group ID is not in its session
+- **THEN** the response SHALL be HTTP 404 and the booking SHALL be unchanged
+
+#### Scenario: Cancelling with a GET request
+- **WHEN** a browser sends `GET /bookings/<group_id>/cancel/`
+- **THEN** the response SHALL be HTTP 405 and the booking SHALL be unchanged
+
+#### Scenario: Cancelling an already-cancelled booking
+- **WHEN** a browser cancels a booking that is already cancelled
+- **THEN** no change SHALL be made and the response SHALL report that the
+  booking is not active
+
 ### Requirement: My bookings page
 The system SHALL expose `GET /my-bookings/` (name: `my-bookings`) that takes no
 arguments and returns an HTML page listing the bookings whose group IDs are
-stored in the current session, each showing all of its seats and linking to its
-confirmation page. This lets a visitor review the seats they reserved during the
-current visit without an account.
+stored in the current session, each showing all of its seats, linking to its
+confirmation page, and offering to cancel it while it is still confirmed. This
+lets a visitor review and release the seats they reserved during the current
+visit without an account.
 
 #### Scenario: Viewing bookings made this session
 - **WHEN** a browser sends `GET /my-bookings/` after reserving one or more seats

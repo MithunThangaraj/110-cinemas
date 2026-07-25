@@ -55,9 +55,31 @@ def reserve_seat(seat_id, customer_name="", customer_email=""):
 
 
 def cancel_reservation(reservation_id):
+    """Cancel one seat's reservation, freeing the seat."""
     reservation = Reservation.objects.get(pk=reservation_id)
     if reservation.status == "cancelled":
         raise ValidationError("Reservation is already cancelled.")
     reservation.status = "cancelled"
     reservation.save(update_fields=["status"])
     return reservation
+
+
+@transaction.atomic
+def cancel_booking(group_id):
+    """Cancel every seat in a booking, freeing all of them at once.
+
+    Cancelling only changes `status`, so the partial unique constraint on
+    confirmed reservations no longer applies and the seats can be booked again.
+    """
+    reservations = list(
+        Reservation.objects.select_for_update().filter(
+            group_id=group_id, status="confirmed"
+        )
+    )
+    if not reservations:
+        raise ValidationError("That booking is not active.")
+
+    for reservation in reservations:
+        reservation.status = "cancelled"
+        reservation.save(update_fields=["status"])
+    return reservations

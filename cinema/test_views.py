@@ -214,6 +214,93 @@ class TestBookingConfirmation:
 
 
 @pytest.mark.django_db
+class TestCancelBooking:
+    def _book(self, client, screening, count=2):
+        seats = list(screening.seats.all()[:count])
+        client.post(
+            reverse("reserve-seats", args=[screening.id]),
+            {"seats": [seat.id for seat in seats]},
+        )
+        return seats, seats[0].reservations.get(status="confirmed").group_id
+
+    def test_cancel_frees_every_seat_in_the_booking(self, client, future_screening):
+        seats, group_id = self._book(client, future_screening)
+        response = client.post(reverse("cancel-booking", args=[group_id]))
+        assert response.status_code == 302
+        assert response.url == reverse("my-bookings")
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_cancelled_seats_can_be_booked_again(self, client, future_screening):
+        seats, group_id = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[group_id]))
+
+        client.post(
+            reverse("reserve-seats", args=[future_screening.id]),
+            {"seats": [seat.id for seat in seats]},
+        )
+        assert all(seat.is_available is False for seat in seats)
+
+    def test_get_does_not_cancel(self, client, future_screening):
+        seats, group_id = self._book(client, future_screening)
+        response = client.get(reverse("cancel-booking", args=[group_id]))
+        assert response.status_code == 405
+        assert all(seat.is_available is False for seat in seats)
+
+    def test_cannot_cancel_a_booking_from_another_session(
+        self, client, django_client_factory, future_screening
+    ):
+        seats, group_id = self._book(client, future_screening)
+
+        stranger = django_client_factory()
+        response = stranger.post(reverse("cancel-booking", args=[group_id]))
+
+        assert response.status_code == 404
+        assert all(seat.is_available is False for seat in seats)
+
+    def test_cancelling_twice_is_reported_not_crashed(self, client, future_screening):
+        _, group_id = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[group_id]))
+        response = client.post(reverse("cancel-booking", args=[group_id]), follow=True)
+        assert response.status_code == 200
+        assert b"not active" in response.content
+
+    def test_htmx_cancel_returns_client_redirect(self, client, future_screening):
+        seats, group_id = self._book(client, future_screening)
+        response = client.post(
+            reverse("cancel-booking", args=[group_id]), HTTP_HX_REQUEST="true"
+        )
+        assert response.status_code == 200
+        assert response["HX-Redirect"] == reverse("my-bookings")
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_confirmation_offers_cancelling_to_the_booker(
+        self, client, future_screening
+    ):
+        _, group_id = self._book(client, future_screening)
+        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        assert b"Cancel booking" in response.content
+
+    def test_confirmation_hides_cancelling_from_others(
+        self, client, django_client_factory, future_screening
+    ):
+        _, group_id = self._book(client, future_screening)
+        stranger = django_client_factory()
+        response = stranger.get(reverse("booking-confirmation", args=[group_id]))
+        assert response.status_code == 200
+        assert b"Cancel booking" not in response.content
+
+    def test_confirmation_shows_a_cancelled_booking_as_cancelled(
+        self, client, future_screening
+    ):
+        _, group_id = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[group_id]))
+        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        assert response.status_code == 200
+        assert b"Booking cancelled" in response.content
+        assert b"Cancel booking" not in response.content
+
+
+@pytest.mark.django_db
 class TestMyBookings:
     def test_my_bookings_lists_bookings_from_this_session(
         self, client, future_screening

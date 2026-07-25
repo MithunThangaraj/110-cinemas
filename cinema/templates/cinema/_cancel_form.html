@@ -1,0 +1,14 @@
+{% comment %}
+Cancelling changes state, so it must be a POST form, never a link: a browser or
+crawler prefetching a GET would cancel the booking.
+{% endcomment %}
+<form
+    class="cancel-form"
+    method="post"
+    action="{% url 'cancel-booking' group_id %}"
+    hx-post="{% url 'cancel-booking' group_id %}"
+    hx-confirm="Cancel this booking? The seats will go back on sale."
+>
+    {% csrf_token %}
+    <button type="submit" class="button button--danger">Cancel booking</button>
+</form>

@@ -3,11 +3,12 @@ from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django_htmx.http import HttpResponseClientRedirect
 
 from .forms import MovieSearchForm
 from .models import Movie, Reservation, Screening
-from .services import MAX_SEATS_PER_BOOKING, create_booking
+from .services import MAX_SEATS_PER_BOOKING, cancel_booking, create_booking
 
 # Session key under which we remember the bookings made in the current visit,
 # so a visitor can see "My Bookings" without needing an account.
@@ -102,6 +103,15 @@ def reserve_seats(request, screening_id):
     return redirect(confirmation_url)
 
 
+def _booked_in_this_session(request, group_id):
+    """Whether this visitor made the booking.
+
+    Booking references are UUIDs in the URL, so without this check anyone who
+    got hold of a link could cancel someone else's seats.
+    """
+    return str(group_id) in request.session.get(SESSION_BOOKINGS_KEY, [])
+
+
 def booking_confirmation(request, group_id):
     reservations = list(
         Reservation.objects.filter(group_id=group_id)
@@ -112,6 +122,7 @@ def booking_confirmation(request, group_id):
         raise Http404("No booking with that reference.")
 
     screening = reservations[0].seat.screening
+    status = reservations[0].status
     return render(
         request,
         "cinema/booking_confirmation.html",
@@ -121,8 +132,35 @@ def booking_confirmation(request, group_id):
             "screening": screening,
             "seats": [reservation.seat for reservation in reservations],
             "total": screening.base_price * len(reservations),
+            "status": status,
+            "can_cancel": (
+                status == "confirmed" and _booked_in_this_session(request, group_id)
+            ),
         },
     )
+
+
+@require_POST
+def cancel_booking_view(request, group_id):
+    # 404 rather than 403: a visitor should not be able to probe which booking
+    # references exist.
+    if not _booked_in_this_session(request, group_id):
+        raise Http404("No booking with that reference.")
+
+    try:
+        reservations = cancel_booking(group_id)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        messages.success(
+            request,
+            f"Booking cancelled. {len(reservations)} seat(s) are available again.",
+        )
+
+    url = reverse("my-bookings")
+    if request.htmx:
+        return HttpResponseClientRedirect(url)
+    return redirect(url)
 
 
 def _group_into_bookings(reservations):

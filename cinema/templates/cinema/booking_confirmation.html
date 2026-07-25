@@ -4,10 +4,15 @@
 
 {% block content %}
 <section class="confirmation">
+    {% if status == "cancelled" %}
+    <p class="confirmation__badge confirmation__badge--cancelled">Booking cancelled</p>
+    <h2 class="confirmation__title">This booking was cancelled</h2>
+    {% else %}
     <p class="confirmation__badge">Booking confirmed</p>
     <h2 class="confirmation__title">You&rsquo;re going to the movies</h2>
+    {% endif %}
 
-    <article class="ticket">
+    <article class="ticket {% if status == 'cancelled' %}ticket--cancelled{% endif %}">
         <div class="ticket__stub">
             <span class="ticket__seats">
                 {% for seat in seats %}<span>{{ seat.row }}{{ seat.number }}</span>{% endfor %}
@@ -41,5 +46,15 @@
         <a class="button" href="{% url 'my-bookings' %}">My bookings</a>
         <a class="button button--ghost" href="{% url 'movie-list' %}">Book another</a>
     </p>
+
+    {% if can_cancel %}
+    <div class="confirmation__cancel">
+        {% include "cinema/_cancel_form.html" %}
+        <p class="confirmation__cancel-note">
+            Changed your mind? Cancelling puts all {{ seats|length }} seat{{ seats|pluralize }}
+            back on sale.
+        </p>
+    </div>
+    {% endif %}
 </section>
 {% endblock %}
