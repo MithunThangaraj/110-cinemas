@@ -28,6 +28,10 @@ def create_booking(seat_ids, customer_name="", customer_email=""):
     # Lock every seat before checking availability, so two visitors booking at
     # the same time cannot both see the same seat as free. Ordering by primary
     # key keeps concurrent bookings from deadlocking against each other.
+    #
+    # Note: SQLite ignores select_for_update(), so on the current deployment the
+    # backstop against a double booking is the partial UniqueConstraint on
+    # confirmed reservations, not this lock. The lock matters on Postgres.
     seats = list(
         Seat.objects.select_for_update().filter(pk__in=seat_ids).order_by("pk")
     )
@@ -54,32 +58,26 @@ def reserve_seat(seat_id, customer_name="", customer_email=""):
     return create_booking([seat_id], customer_name, customer_email)[0]
 
 
-def cancel_reservation(reservation_id):
-    """Cancel one seat's reservation, freeing the seat."""
-    reservation = Reservation.objects.get(pk=reservation_id)
-    if reservation.status == "cancelled":
-        raise ValidationError("Reservation is already cancelled.")
-    reservation.status = "cancelled"
-    reservation.save(update_fields=["status"])
-    return reservation
-
-
 @transaction.atomic
 def cancel_booking(group_id):
-    """Cancel every seat in a booking, freeing all of them at once.
+    """Cancel every confirmed seat in a booking, freeing all of them at once.
 
     Cancelling only changes `status`, so the partial unique constraint on
     confirmed reservations no longer applies and the seats can be booked again.
+
+    Cancelling is booking-wide on purpose: a per-seat cancel would let a booking
+    end up half-cancelled, which the confirmation page has no sensible way to
+    describe.
     """
     reservations = list(
         Reservation.objects.select_for_update().filter(
-            group_id=group_id, status="confirmed"
+            group_id=group_id, status=Reservation.Status.CONFIRMED
         )
     )
     if not reservations:
         raise ValidationError("That booking is not active.")
 
     for reservation in reservations:
-        reservation.status = "cancelled"
+        reservation.status = Reservation.Status.CANCELLED
         reservation.save(update_fields=["status"])
     return reservations

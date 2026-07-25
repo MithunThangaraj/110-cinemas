@@ -10,7 +10,6 @@ from .models import POSTER_THEMES, Movie, Reservation, Screening, Seat
 from .services import (
     MAX_SEATS_PER_BOOKING,
     cancel_booking,
-    cancel_reservation,
     create_booking,
     reserve_seat,
 )
@@ -137,17 +136,17 @@ class TestServices:
         with pytest.raises(ValidationError):
             reserve_seat(seat.id)
 
-    def test_cancel_reservation(self, future_screening):
+    def test_cancel_booking_marks_the_reservation_cancelled(self, future_screening):
         seat = future_screening.seats.first()
         reservation = reserve_seat(seat.id)
-        cancel_reservation(reservation.id)
+        cancel_booking(reservation.group_id)
         reservation.refresh_from_db()
         assert reservation.status == "cancelled"
 
     def test_seat_available_after_cancel(self, future_screening):
         seat = future_screening.seats.first()
         reservation = reserve_seat(seat.id)
-        cancel_reservation(reservation.id)
+        cancel_booking(reservation.group_id)
         assert seat.is_available is True
 
     def test_available_seats_query_excludes_reserved(self, future_screening):

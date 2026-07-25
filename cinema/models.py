@@ -86,10 +86,16 @@ class Seat(models.Model):
 
     @property
     def is_available(self):
-        return not self.reservations.filter(status="confirmed").exists()
+        return not self.reservations.filter(
+            status=Reservation.Status.CONFIRMED
+        ).exists()
 
 
 class Reservation(models.Model):
+    class Status(models.TextChoices):
+        CONFIRMED = "confirmed", "Confirmed"
+        CANCELLED = "cancelled", "Cancelled"
+
     seat = models.ForeignKey(
         Seat, on_delete=models.CASCADE, related_name="reservations"
     )
@@ -101,13 +107,16 @@ class Reservation(models.Model):
     customer_email = models.EmailField(blank=True, default="")
     status = models.CharField(
         max_length=10,
-        choices=[("confirmed", "Confirmed"), ("cancelled", "Cancelled")],
-        default="confirmed",
+        choices=Status.choices,
+        default=Status.CONFIRMED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [
+            # The literal is deliberate: Status is not yet bound while this
+            # Meta class body is being evaluated. This constraint is what
+            # actually prevents a seat being double-booked.
             models.UniqueConstraint(
                 fields=["seat", "status"],
                 condition=Q(status="confirmed"),

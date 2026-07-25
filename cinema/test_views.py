@@ -1,4 +1,5 @@
 import pytest
+from django.test import Client
 from django.urls import reverse
 
 from .services import MAX_SEATS_PER_BOOKING, reserve_seat
@@ -288,6 +289,51 @@ class TestCancelBooking:
         response = stranger.get(reverse("booking-confirmation", args=[group_id]))
         assert response.status_code == 200
         assert b"Cancel booking" not in response.content
+
+    def test_partly_cancelled_booking_still_offers_cancelling(
+        self, client, future_screening
+    ):
+        """Regression: a booking whose first seat was cancelled on its own (the
+        admin can do this) used to report itself cancelled and hide the cancel
+        control, stranding the seats that were still sold."""
+        seats, group_id = self._book(client, future_screening, count=3)
+        first = seats[0].reservations.get(status="confirmed")
+        first.status = "cancelled"
+        first.save(update_fields=["status"])
+
+        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        assert b"Booking cancelled" not in response.content
+        assert b"Cancel booking" in response.content
+
+        # ...and cancelling then releases the seats that were still sold.
+        client.post(reverse("cancel-booking", args=[group_id]))
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_partly_cancelled_booking_still_lists_as_confirmed(
+        self, client, future_screening
+    ):
+        seats, _ = self._book(client, future_screening, count=2)
+        first = seats[0].reservations.get(status="confirmed")
+        first.status = "cancelled"
+        first.save(update_fields=["status"])
+
+        response = client.get(reverse("my-bookings"))
+        assert b"confirmed" in response.content
+
+    def test_cancel_requires_a_csrf_token(self, client, future_screening):
+        """The session check is not the only thing standing between a stranger
+        and someone's seats: a cross-site POST carrying the victim's cookies
+        has to be rejected by CSRF too."""
+        seats, group_id = self._book(client, future_screening)
+
+        # Same session (so the ownership check passes), but no CSRF token.
+        forged = Client(enforce_csrf_checks=True)
+        forged.cookies = client.cookies
+
+        response = forged.post(reverse("cancel-booking", args=[group_id]))
+
+        assert response.status_code == 403
+        assert all(seat.is_available is False for seat in seats)
 
     def test_confirmation_shows_a_cancelled_booking_as_cancelled(
         self, client, future_screening

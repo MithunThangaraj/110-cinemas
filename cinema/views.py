@@ -103,6 +103,18 @@ def reserve_seats(request, screening_id):
     return redirect(confirmation_url)
 
 
+def _booking_status(reservations):
+    """A booking counts as confirmed while any of its seats still is.
+
+    Taking the status of one reservation would mislabel a booking that was only
+    partly cancelled (which the admin can do), hiding the cancel control while
+    seats were still sold.
+    """
+    if any(r.status == Reservation.Status.CONFIRMED for r in reservations):
+        return Reservation.Status.CONFIRMED
+    return Reservation.Status.CANCELLED
+
+
 def _booked_in_this_session(request, group_id):
     """Whether this visitor made the booking.
 
@@ -122,7 +134,7 @@ def booking_confirmation(request, group_id):
         raise Http404("No booking with that reference.")
 
     screening = reservations[0].seat.screening
-    status = reservations[0].status
+    status = _booking_status(reservations)
     return render(
         request,
         "cinema/booking_confirmation.html",
@@ -152,9 +164,11 @@ def cancel_booking_view(request, group_id):
     except ValidationError as error:
         messages.error(request, error.messages[0])
     else:
+        count = len(reservations)
         messages.success(
             request,
-            f"Booking cancelled. {len(reservations)} seat(s) are available again.",
+            f"Booking cancelled. {count} seat{'' if count == 1 else 's'} "
+            f"{'is' if count == 1 else 'are'} available again.",
         )
 
     url = reverse("my-bookings")
@@ -173,11 +187,15 @@ def _group_into_bookings(reservations):
                 "group_id": reservation.group_id,
                 "screening": reservation.seat.screening,
                 "created_at": reservation.created_at,
-                "status": reservation.status,
+                "reservations": [],
                 "seats": [],
             },
         )
+        booking["reservations"].append(reservation)
         booking["seats"].append(reservation.seat)
+
+    for booking in bookings.values():
+        booking["status"] = _booking_status(booking["reservations"])
     return sorted(bookings.values(), key=lambda b: b["created_at"], reverse=True)
 
 
