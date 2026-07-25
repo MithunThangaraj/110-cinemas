@@ -25,15 +25,37 @@ Then open http://localhost:8000/movies/. Create some data via the admin:
 uv run python manage.py createsuperuser
 ```
 and add a Movie and a Screening at http://localhost:8000/admin/ (seats are
-generated automatically when a screening is saved).
+generated automatically when a screening is saved). Or just seed the demo
+catalogue:
+```bash
+uv run python manage.py seed_demo_data
+uv run python manage.py fetch_posters
+```
+
+## Booking
+
+A visitor picks up to **6 seats** on the seat map and reserves them in one step
+— no name, email, or account. Seats booked together share a `group_id` and are
+reserved all-or-nothing: if any one of them is taken in the meantime, none are
+booked. The limit lives in `cinema/services.py` as `MAX_SEATS_PER_BOOKING` and
+is enforced on the server; the browser only mirrors it.
 
 ## Posters
 
-`Movie.poster_image` is an optional URL. Real film posters are copyrighted and
-no free API serves them reliably, so a movie without a poster URL is rendered
-as generated key-art instead of a broken image: a coloured card whose palette
-is derived from the title (`Movie.poster_theme`). Set `poster_image` in the
-admin to show a real poster instead.
+Posters come from Apple's **iTunes Search API**, which is free and needs no API
+key or account — so there is nothing to configure, locally or on render:
+
+```bash
+uv run python manage.py fetch_posters          # fill in missing posters
+uv run python manage.py fetch_posters --force  # look them all up again
+```
+
+Only an **exact** title match is accepted (see `cinema/posters.py`): the API
+readily returns loosely related films, and the wrong poster is worse than none.
+The store's film coverage is incomplete, so a movie with no match simply keeps
+its generated key-art — a coloured card whose palette is derived from the title
+(`Movie.poster_theme`) — instead of showing a broken image. You can always set
+`Movie.poster_image` by hand in the admin to override either result.
 
 ## Run Linter
 ```bash

@@ -94,6 +94,9 @@ class Reservation(models.Model):
         Seat, on_delete=models.CASCADE, related_name="reservations"
     )
     booking_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    # Seats reserved together in one booking share a group_id, so a visitor can
+    # be shown (and can look up) their whole booking rather than one seat.
+    group_id = models.UUIDField(default=uuid.uuid4, db_index=True)
     customer_name = models.CharField(max_length=255, blank=True, default="")
     customer_email = models.EmailField(blank=True, default="")
     status = models.CharField(

@@ -1,26 +1,4 @@
-from .forms import MovieSearchForm, ReservationForm
-
-
-class TestReservationForm:
-    def test_valid_data(self):
-        form = ReservationForm(
-            {"customer_name": "Ada Lovelace", "customer_email": "ada@example.com"}
-        )
-        assert form.is_valid()
-
-    def test_missing_name_is_invalid(self):
-        form = ReservationForm(
-            {"customer_name": "", "customer_email": "ada@example.com"}
-        )
-        assert not form.is_valid()
-        assert "customer_name" in form.errors
-
-    def test_invalid_email_is_invalid(self):
-        form = ReservationForm(
-            {"customer_name": "Ada", "customer_email": "not-an-email"}
-        )
-        assert not form.is_valid()
-        assert "customer_email" in form.errors
+from .forms import MovieSearchForm
 
 
 class TestMovieSearchForm:
@@ -31,3 +9,7 @@ class TestMovieSearchForm:
     def test_query_is_optional(self):
         form = MovieSearchForm({})
         assert form.is_valid()
+
+    def test_labels_have_no_colon_suffix(self):
+        form = MovieSearchForm()
+        assert form["q"].label_tag().endswith("Search</label>")

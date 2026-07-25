@@ -6,56 +6,72 @@ from django.utils import timezone
 from cinema.models import Movie, Screening
 
 # (title, description, release_date, runtime_minutes)
+#
+# Titles are spelled exactly as the iTunes Search API lists them, because
+# `fetch_posters` only accepts an exact match — see cinema/posters.py.
 DEMO_MOVIES = [
     (
-        "Dune: Part Three",
-        "The Fremen rise as Paul's empire faces its long-delayed reckoning.",
-        date(2027, 10, 15),
-        165,
+        "Dune: Part Two",
+        "Paul Atreides unites with the Fremen to wage war against the "
+        "conspirators who destroyed his family.",
+        date(2024, 3, 1),
+        166,
     ),
     (
-        "Neon Harbour",
-        "A dock worker uncovers a smuggling ring hidden under the night market.",
-        date(2026, 9, 4),
-        118,
+        "Interstellar",
+        "A team of explorers travels through a wormhole in search of a new "
+        "home for humanity.",
+        date(2014, 11, 7),
+        169,
     ),
     (
-        "The Grand Budapest Hotel",
-        "A concierge and his lobby boy chase a stolen painting across Europe.",
-        date(2014, 3, 28),
-        99,
+        "The Batman",
+        "Two years into his war on crime, Batman follows a trail of riddles "
+        "left by a killer stalking Gotham.",
+        date(2022, 3, 4),
+        176,
     ),
     (
-        "Spirited Away",
-        "A girl wanders into a world of spirits to win back her parents.",
-        date(2001, 7, 20),
-        125,
+        "Barbie",
+        "Barbie leaves the perfection of Barbie Land for the real world, and "
+        "finds neither is quite what it seems.",
+        date(2023, 7, 21),
+        114,
     ),
     (
-        "Paper Moons",
-        "Two estranged sisters drive across the country to sell their late "
-        "father's observatory.",
-        date(2026, 5, 22),
-        104,
+        "Challengers",
+        "A former tennis prodigy turned coach puts her husband and her ex "
+        "against each other on court.",
+        date(2024, 4, 26),
+        131,
     ),
     (
-        "Silent Orbit",
-        "A repair crew wakes to find their station has drifted out of contact.",
-        date(2026, 11, 6),
-        137,
+        "Gladiator II",
+        "Years after the death of Maximus, a man forced into the Colosseum "
+        "looks for a way to strike back at Rome.",
+        date(2024, 11, 22),
+        148,
     ),
     (
-        "The Last Bookshop",
-        "A bookseller fights to keep the oldest shop in the city from closing.",
-        date(2025, 12, 12),
-        92,
+        "Furiosa: A Mad Max Saga",
+        "Snatched from the Green Place as a child, Furiosa fights her way "
+        "back across the Wasteland.",
+        date(2024, 5, 24),
+        148,
     ),
     (
-        "Midnight Ramen",
-        "Regulars at a tiny late-night counter trade the stories they cannot "
-        "tell anyone else.",
-        date(2026, 2, 14),
-        88,
+        "Wonka",
+        "A young chocolatier arrives in the city with a hatful of dreams and "
+        "a cartel of rivals waiting for him.",
+        date(2023, 12, 15),
+        116,
+    ),
+    (
+        "Deadpool & Wolverine",
+        "A reluctant Wolverine is dragged into cleaning up a mess only "
+        "Deadpool could have made.",
+        date(2024, 7, 26),
+        128,
     ),
 ]
 

@@ -7,7 +7,12 @@ from django.db import IntegrityError
 from django.utils import timezone
 
 from .models import POSTER_THEMES, Movie, Reservation, Screening, Seat
-from .services import cancel_reservation, reserve_seat
+from .services import (
+    MAX_SEATS_PER_BOOKING,
+    cancel_reservation,
+    create_booking,
+    reserve_seat,
+)
 
 
 @pytest.mark.django_db
@@ -154,3 +159,50 @@ class TestServices:
         ]
         assert first_seat not in available
         assert second_seat in available
+
+
+@pytest.mark.django_db
+class TestCreateBooking:
+    def test_seats_booked_together_share_a_group(self, future_screening):
+        seats = list(future_screening.seats.all()[:3])
+        reservations = create_booking([seat.id for seat in seats])
+        assert len(reservations) == 3
+        assert len({r.group_id for r in reservations}) == 1
+
+    def test_separate_bookings_get_separate_groups(self, future_screening):
+        seats = list(future_screening.seats.all()[:2])
+        first = create_booking([seats[0].id])
+        second = create_booking([seats[1].id])
+        assert first[0].group_id != second[0].group_id
+
+    def test_duplicate_seat_ids_are_booked_once(self, future_screening):
+        seat = future_screening.seats.first()
+        reservations = create_booking([seat.id, seat.id])
+        assert len(reservations) == 1
+
+    def test_empty_selection_is_rejected(self, future_screening):
+        with pytest.raises(ValidationError):
+            create_booking([])
+
+    def test_more_than_the_limit_is_rejected(self, future_screening):
+        seats = list(future_screening.seats.all()[: MAX_SEATS_PER_BOOKING + 1])
+        with pytest.raises(ValidationError):
+            create_booking([seat.id for seat in seats])
+
+    def test_exactly_the_limit_is_allowed(self, future_screening):
+        seats = list(future_screening.seats.all()[:MAX_SEATS_PER_BOOKING])
+        reservations = create_booking([seat.id for seat in seats])
+        assert len(reservations) == MAX_SEATS_PER_BOOKING
+
+    def test_unknown_seat_id_is_rejected(self, future_screening):
+        seat = future_screening.seats.first()
+        with pytest.raises(ValidationError):
+            create_booking([seat.id, 999999])
+
+    def test_one_taken_seat_books_none_of_them(self, future_screening):
+        seats = list(future_screening.seats.all()[:3])
+        reserve_seat(seats[2].id)
+        with pytest.raises(ValidationError):
+            create_booking([seat.id for seat in seats])
+        assert seats[0].is_available is True
+        assert seats[1].is_available is True
