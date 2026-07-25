@@ -1,0 +1,45 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}Booking Confirmed - 110 Cinemas{% endblock %}
+
+{% block content %}
+<section class="confirmation">
+    <p class="confirmation__badge">Booking confirmed</p>
+    <h2 class="confirmation__title">You&rsquo;re going to the movies</h2>
+
+    <article class="ticket">
+        <div class="ticket__stub">
+            <span class="ticket__seats">
+                {% for seat in seats %}<span>{{ seat.row }}{{ seat.number }}</span>{% endfor %}
+            </span>
+            <span class="ticket__seat-label">{{ seats|length }} seat{{ seats|pluralize }}</span>
+        </div>
+        <div class="ticket__body">
+            <h3 class="ticket__movie">{{ screening.movie.title }}</h3>
+            <dl class="ticket__details">
+                <div>
+                    <dt>When</dt>
+                    <dd>{{ screening.start_time|date:"D j M Y, H:i" }}</dd>
+                </div>
+                <div>
+                    <dt>Where</dt>
+                    <dd>{{ screening.venue }}</dd>
+                </div>
+                <div>
+                    <dt>Total</dt>
+                    <dd>&euro;{{ total }}</dd>
+                </div>
+                <div>
+                    <dt>Booking reference</dt>
+                    <dd class="ticket__code">{{ group_id }}</dd>
+                </div>
+            </dl>
+        </div>
+    </article>
+
+    <p class="confirmation__actions">
+        <a class="button" href="{% url 'my-bookings' %}">My bookings</a>
+        <a class="button button--ghost" href="{% url 'movie-list' %}">Book another</a>
+    </p>
+</section>
+{% endblock %}

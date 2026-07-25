@@ -4,22 +4,24 @@
 
 {% block content %}
 <h2 class="page-title">My Bookings</h2>
-<p class="page-lead">Reservations you made in this browser session.</p>
+<p class="page-lead">Bookings you made in this browser session.</p>
 
 <ul class="booking-list">
-    {% for reservation in reservations %}
+    {% for booking in bookings %}
     <li>
-        <a class="booking" href="{% url 'reservation-confirmation' reservation.id %}">
-            <span class="booking__seat">{{ reservation.seat.row }}{{ reservation.seat.number }}</span>
+        <a class="booking" href="{% url 'booking-confirmation' booking.group_id %}">
+            <span class="booking__seats">
+                {% for seat in booking.seats %}<span class="booking__seat">{{ seat.row }}{{ seat.number }}</span>{% endfor %}
+            </span>
             <span class="booking__info">
-                <span class="booking__movie">{{ reservation.seat.screening.movie.title }}</span>
+                <span class="booking__movie">{{ booking.screening.movie.title }}</span>
                 <span class="booking__meta">
-                    {{ reservation.seat.screening.start_time|date:"D j M, H:i" }}
-                    &middot; {{ reservation.seat.screening.venue }}
+                    {{ booking.screening.start_time|date:"D j M, H:i" }}
+                    &middot; {{ booking.screening.venue }}
                 </span>
             </span>
-            <span class="booking__status booking__status--{{ reservation.status }}">
-                {{ reservation.status }}
+            <span class="booking__status booking__status--{{ booking.status }}">
+                {{ booking.status }}
             </span>
         </a>
     </li>

@@ -36,8 +36,8 @@ urlpatterns = [
         name="reserve-seats",
     ),
     path(
-        "reservations/<int:reservation_id>/",
-        views.reservation_confirmation,
-        name="reservation-confirmation",
+        "bookings/<uuid:group_id>/",
+        views.booking_confirmation,
+        name="booking-confirmation",
     ),
 ]

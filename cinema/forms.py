@@ -23,15 +23,6 @@ class MovieSearchForm(NoSuffixForm):
     )
 
 
-class ReservationForm(NoSuffixForm):
-    """POST form collecting the details needed to book a seat."""
-
-    customer_name = forms.CharField(
-        max_length=255,
-        label="Your name",
-        widget=forms.TextInput(attrs={"placeholder": "Ada Lovelace"}),
-    )
-    customer_email = forms.EmailField(
-        label="Your email",
-        widget=forms.EmailInput(attrs={"placeholder": "ada@example.com"}),
-    )
+# Booking currently asks for nothing but the seats: `Reservation.customer_name`
+# and `customer_email` are still on the model, so a details step can be added
+# back later without a migration.

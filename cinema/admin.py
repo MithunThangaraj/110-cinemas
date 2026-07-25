@@ -5,9 +5,13 @@ from .models import Movie, Reservation, Screening, Seat
 
 @admin.register(Movie)
 class MovieAdmin(admin.ModelAdmin):
-    list_display = ["title", "release_date", "runtime_minutes"]
+    list_display = ["title", "release_date", "runtime_minutes", "has_poster"]
     list_filter = ["release_date"]
     search_fields = ["title"]
+
+    @admin.display(boolean=True, description="Poster")
+    def has_poster(self, movie):
+        return bool(movie.poster_image)
 
 
 @admin.register(Screening)
@@ -25,6 +29,6 @@ class SeatAdmin(admin.ModelAdmin):
 
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ["booking_id", "seat", "customer_name", "status", "created_at"]
+    list_display = ["booking_id", "group_id", "seat", "status", "created_at"]
     list_filter = ["status"]
-    search_fields = ["customer_name", "customer_email", "booking_id"]
+    search_fields = ["customer_name", "customer_email", "booking_id", "group_id"]

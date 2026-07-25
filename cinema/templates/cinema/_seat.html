@@ -1,13 +1,13 @@
 {% if seat.is_available %}
 <label class="seat seat--available">
     <input
-        type="radio"
-        name="seat"
+        type="checkbox"
+        name="seats"
         value="{{ seat.id }}"
         class="visually-hidden"
         data-code="{{ seat.row }}{{ seat.number }}"
         aria-label="Seat {{ seat.row }}{{ seat.number }}, available"
-        {% if selected_seat_id == seat.id %}checked{% endif %}
+        {% if seat.id in selected_seat_ids %}checked{% endif %}
     >
     <span class="seat__code" aria-hidden="true">{{ seat.number }}</span>
 </label>

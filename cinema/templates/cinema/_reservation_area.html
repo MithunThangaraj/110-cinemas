@@ -2,6 +2,8 @@
     class="reservation"
     method="post"
     action="{% url 'reserve-seats' screening.id %}"
+    data-max-seats="{{ max_seats }}"
+    data-seat-price="{{ screening.base_price }}"
     hx-post="{% url 'reserve-seats' screening.id %}"
     hx-target="this"
     hx-swap="outerHTML"
@@ -12,7 +14,7 @@
         <p class="screen" aria-hidden="true"><span>Screen</span></p>
 
         <fieldset class="seat-grid">
-            <legend class="visually-hidden">Choose a seat</legend>
+            <legend class="visually-hidden">Choose up to {{ max_seats }} seats</legend>
             {% comment %}
             The inner wrapper is what scrolls: a fieldset defaults to
             min-width: min-content, so it cannot be a scroll container itself.
@@ -27,7 +29,7 @@
                         {% include "cinema/_seat.html" %}
                         {% endfor %}
                     </div>
-                    <span class="seat-row__label seat-row__label--end" aria-hidden="true">{{ row.grouper }}</span>
+                    <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -44,30 +46,31 @@
 
     <div class="checkout">
         <p class="checkout__summary">
-            Seat
-            <strong class="checkout__seat">{% if selected_seat %}{{ selected_seat.row }}{{ selected_seat.number }}{% else %}not chosen yet{% endif %}</strong>
+            <span class="checkout__label">Your seats</span>
+            <strong class="checkout__seats">{% if selected_seats %}{% for seat in selected_seats %}{{ seat.row }}{{ seat.number }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}none chosen yet{% endif %}</strong>
+        </p>
+
+        <p class="checkout__total">
+            <span>{{ selected_seats|length }} of {{ max_seats }} seats</span>
+            <span class="checkout__price">&euro;{{ screening.base_price }} each</span>
         </p>
 
         {% if seat_error %}
         <p class="checkout__error" role="alert">{{ seat_error }}</p>
         {% endif %}
 
-        {% for field in form %}
-        <div class="form-field">
-            {{ field.label_tag }}
-            {{ field }}
-            {{ field.errors }}
-        </div>
-        {% endfor %}
+        <p class="checkout__limit" role="status"></p>
 
-        <button type="submit">Reserve seat</button>
+        <button type="submit">Reserve seats</button>
     </div>
 
     <script>
-        /* Progressive enhancement: mirror the chosen seat into the checkout box.
-           The listener is bound to this form, which HTMX replaces wholesale on
-           every swap, so no listeners are left behind. Resolving the form from
-           the running script avoids binding to the outgoing form during a swap. */
+        /* Progressive enhancement: keep the checkout in step with the seat map
+           and stop the visitor picking more than the allowed number of seats.
+           The server enforces the same limit. Listeners are bound to this form,
+           which HTMX replaces wholesale on every swap, so nothing leaks.
+           Resolving the form from the running script (rather than by selector)
+           avoids binding to the outgoing form during a swap. */
         (function () {
             var current = document.currentScript;
             var form = current
@@ -76,12 +79,60 @@
             if (!form) {
                 return;
             }
-            var output = form.querySelector(".checkout__seat");
+
+            var maxSeats = parseInt(form.dataset.maxSeats, 10) || 1;
+            var price = parseFloat(form.dataset.seatPrice) || 0;
+            var seatsOutput = form.querySelector(".checkout__seats");
+            var totalOutput = form.querySelector(".checkout__total");
+            var limitOutput = form.querySelector(".checkout__limit");
+            var button = form.querySelector(".checkout button");
+            var boxes = Array.prototype.slice.call(
+                form.querySelectorAll('input[name="seats"]')
+            );
 
             function update() {
-                var checked = form.querySelector('input[name="seat"]:checked');
-                output.textContent = checked ? checked.dataset.code : "not chosen yet";
-                form.classList.toggle("reservation--chosen", Boolean(checked));
+                var chosen = boxes.filter(function (box) {
+                    return box.checked;
+                });
+                var atLimit = chosen.length >= maxSeats;
+
+                boxes.forEach(function (box) {
+                    box.disabled = atLimit && !box.checked;
+                });
+
+                seatsOutput.textContent = chosen.length
+                    ? chosen
+                          .map(function (box) {
+                              return box.dataset.code;
+                          })
+                          .join(", ")
+                    : "none chosen yet";
+
+                totalOutput.innerHTML = "";
+                var count = document.createElement("span");
+                count.textContent =
+                    chosen.length + " of " + maxSeats + " seats";
+                var total = document.createElement("span");
+                total.className = "checkout__price";
+                total.textContent =
+                    "€" + (chosen.length * price).toFixed(2);
+                totalOutput.appendChild(count);
+                totalOutput.appendChild(total);
+
+                limitOutput.textContent = atLimit
+                    ? "That is the maximum of " +
+                      maxSeats +
+                      " seats. Clear one to pick another."
+                    : "";
+
+                if (chosen.length === 0) {
+                    button.textContent = "Reserve seats";
+                } else if (chosen.length === 1) {
+                    button.textContent = "Reserve seat";
+                } else {
+                    button.textContent = "Reserve " + chosen.length + " seats";
+                }
+                form.classList.toggle("reservation--chosen", chosen.length > 0);
             }
 
             form.addEventListener("change", update);
