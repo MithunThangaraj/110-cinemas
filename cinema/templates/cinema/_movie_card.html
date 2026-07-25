@@ -1,22 +1,33 @@
 <li class="movie-card">
-    {% if movie.poster_image %}
-    <img
-        class="movie-card__poster"
-        src="{{ movie.poster_image }}"
-        alt="Poster for {{ movie.title }}"
-    >
-    {% endif %}
-    <h3>{{ movie.title }}</h3>
-    <p>{{ movie.release_date }}</p>
-    <ul class="screening-list">
-        {% for screening in movie.screenings.all %}
-        <li>
-            <a href="{% url 'seat-selection' screening.id %}">
-                {{ screening.venue }} - {{ screening.start_time }}
-            </a>
-        </li>
-        {% empty %}
-        <li>No screenings scheduled.</li>
-        {% endfor %}
-    </ul>
+    <div class="movie-card__art">
+        {% include "cinema/_poster.html" %}
+    </div>
+
+    <div class="movie-card__body">
+        <h3 class="movie-card__title">{{ movie.title }}</h3>
+        <p class="movie-card__meta">
+            <span>{{ movie.release_date|date:"Y" }}</span>
+            <span class="dot" aria-hidden="true"></span>
+            <span>{{ movie.runtime_minutes }} min</span>
+        </p>
+
+        {% if movie.description %}
+        <p class="movie-card__description">{{ movie.description }}</p>
+        {% endif %}
+
+        <h4 class="movie-card__subhead">Screenings</h4>
+        <ul class="screening-list">
+            {% for screening in movie.screenings.all %}
+            <li>
+                <a class="screening" href="{% url 'seat-selection' screening.id %}">
+                    <span class="screening__when">{{ screening.start_time|date:"D j M, H:i" }}</span>
+                    <span class="screening__venue">{{ screening.venue }}</span>
+                    <span class="screening__price">&euro;{{ screening.base_price }}</span>
+                </a>
+            </li>
+            {% empty %}
+            <li class="screening-list__empty">No screenings scheduled.</li>
+            {% endfor %}
+        </ul>
+    </div>
 </li>

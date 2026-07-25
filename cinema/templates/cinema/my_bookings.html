@@ -3,16 +3,31 @@
 {% block title %}My Bookings - 110 Cinemas{% endblock %}
 
 {% block content %}
-<h2>My Bookings</h2>
-<ul>
+<h2 class="page-title">My Bookings</h2>
+<p class="page-lead">Reservations you made in this browser session.</p>
+
+<ul class="booking-list">
     {% for reservation in reservations %}
     <li>
-        <a href="{% url 'reservation-confirmation' reservation.id %}">
-            {{ reservation.seat }} - {{ reservation.status }}
+        <a class="booking" href="{% url 'reservation-confirmation' reservation.id %}">
+            <span class="booking__seat">{{ reservation.seat.row }}{{ reservation.seat.number }}</span>
+            <span class="booking__info">
+                <span class="booking__movie">{{ reservation.seat.screening.movie.title }}</span>
+                <span class="booking__meta">
+                    {{ reservation.seat.screening.start_time|date:"D j M, H:i" }}
+                    &middot; {{ reservation.seat.screening.venue }}
+                </span>
+            </span>
+            <span class="booking__status booking__status--{{ reservation.status }}">
+                {{ reservation.status }}
+            </span>
         </a>
     </li>
     {% empty %}
-    <li>You have no bookings in this session yet.</li>
+    <li class="empty-state">
+        <p>You have no bookings in this session yet.</p>
+        <a class="button" href="{% url 'movie-list' %}">Browse movies</a>
+    </li>
     {% endfor %}
 </ul>
 {% endblock %}

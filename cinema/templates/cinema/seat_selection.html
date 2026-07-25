@@ -3,7 +3,21 @@
 {% block title %}Select a Seat - 110 Cinemas{% endblock %}
 
 {% block content %}
-<h2>{{ screening.movie.title }} - {{ screening.venue }} ({{ screening.start_time }})</h2>
+<a class="back-link" href="{% url 'movie-list' %}">&larr; All movies</a>
+
+<section class="screening-header">
+    <div class="screening-header__art">
+        {% include "cinema/_poster.html" with movie=screening.movie %}
+    </div>
+    <div>
+        <h2 class="screening-header__title">{{ screening.movie.title }}</h2>
+        <p class="screening-header__meta">
+            <span class="chip">{{ screening.venue }}</span>
+            <span class="chip">{{ screening.start_time|date:"D j M, H:i" }}</span>
+            <span class="chip chip--price">&euro;{{ screening.base_price }}</span>
+        </p>
+    </div>
+</section>
 
 {% include "cinema/_reservation_area.html" %}
 {% endblock %}

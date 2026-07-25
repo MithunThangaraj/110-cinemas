@@ -3,21 +3,31 @@
 {% block title %}Movies - 110 Cinemas{% endblock %}
 
 {% block content %}
-<h2>Now Showing</h2>
+<section class="hero">
+    <p class="hero__eyebrow">Now showing</p>
+    <h2 class="hero__title">Great films, <span class="hero__accent">good seats</span>.</h2>
+    <p class="hero__lead">
+        Pick a screening, choose your seat on the map, and you are done.
+        No account needed.
+    </p>
 
-<form method="get" class="search-form" role="search">
-    <div>
-        {{ form.q.label_tag }}
-        {{ form.q }}
-    </div>
-    <button type="submit">Search</button>
-</form>
+    <form method="get" class="search-form" role="search">
+        <div class="search-form__field">
+            {{ form.q.label_tag }}
+            {{ form.q }}
+        </div>
+        <button type="submit">Search</button>
+    </form>
+</section>
 
-<ul class="movie-list">
+<ul class="movie-grid">
     {% for movie in movies %}
     {% include "cinema/_movie_card.html" %}
     {% empty %}
-    <li>No movies available yet.</li>
+    <li class="empty-state">
+        <p>No movies match that search.</p>
+        <a class="button button--ghost" href="{% url 'movie-list' %}">Show everything</a>
+    </li>
     {% endfor %}
 </ul>
 {% endblock %}

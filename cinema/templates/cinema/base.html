@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>{% block title %}110 Cinemas{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'cinema/css/styles.css' %}">
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
@@ -12,13 +13,28 @@
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <header class="site-header">
-        <h1 class="site-title"><a href="{% url 'movie-list' %}">110 Cinemas</a></h1>
-        <nav class="site-nav" aria-label="Main">
-            <ul>
-                <li><a href="{% url 'movie-list' %}">Movies</a></li>
-                <li><a href="{% url 'my-bookings' %}">My Bookings</a></li>
-            </ul>
-        </nav>
+        <div class="site-header__inner">
+            <a class="brand" href="{% url 'movie-list' %}">
+                <span class="brand__mark" aria-hidden="true">110</span>
+                <span class="brand__name">Cinemas</span>
+            </a>
+            <nav class="site-nav" aria-label="Main">
+                <ul>
+                    <li>
+                        <a href="{% url 'movie-list' %}"
+                            {% if request.resolver_match.url_name == 'movie-list' %}aria-current="page"{% endif %}>
+                            Movies
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'my-bookings' %}"
+                            {% if request.resolver_match.url_name == 'my-bookings' %}aria-current="page"{% endif %}>
+                            My Bookings
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
     </header>
 
     <main id="main-content" class="site-main">

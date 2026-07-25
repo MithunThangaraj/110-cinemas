@@ -9,22 +9,31 @@
     {% csrf_token %}
 
     <div class="theater">
-        <p class="screen" aria-hidden="true">Screen</p>
+        <p class="screen" aria-hidden="true"><span>Screen</span></p>
 
         <fieldset class="seat-grid">
             <legend class="visually-hidden">Choose a seat</legend>
-            {% regroup seats by row as seat_rows %}
-            {% for row in seat_rows %}
-            <div class="seat-row">
-                <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
-                <div class="seat-row__seats">
-                    {% for seat in row.list %}
-                    {% include "cinema/_seat.html" %}
-                    {% endfor %}
+            {% comment %}
+            The inner wrapper is what scrolls: a fieldset defaults to
+            min-width: min-content, so it cannot be a scroll container itself.
+            {% endcomment %}
+            <div class="seat-map">
+                {% regroup seats by row as seat_rows %}
+                {% for row in seat_rows %}
+                <div class="seat-row">
+                    <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
+                    <div class="seat-row__seats">
+                        {% for seat in row.list %}
+                        {% include "cinema/_seat.html" %}
+                        {% endfor %}
+                    </div>
+                    <span class="seat-row__label seat-row__label--end" aria-hidden="true">{{ row.grouper }}</span>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </fieldset>
+
+        <p class="seat-hint">Swipe the seat map sideways to reach every seat.</p>
 
         <ul class="seat-legend">
             <li><span class="seat seat--legend"></span> Available</li>
@@ -34,9 +43,15 @@
     </div>
 
     <div class="checkout">
+        <p class="checkout__summary">
+            Seat
+            <strong class="checkout__seat">{% if selected_seat %}{{ selected_seat.row }}{{ selected_seat.number }}{% else %}not chosen yet{% endif %}</strong>
+        </p>
+
         {% if seat_error %}
         <p class="checkout__error" role="alert">{{ seat_error }}</p>
         {% endif %}
+
         {% for field in form %}
         <div class="form-field">
             {{ field.label_tag }}
@@ -44,6 +59,33 @@
             {{ field.errors }}
         </div>
         {% endfor %}
+
         <button type="submit">Reserve seat</button>
     </div>
+
+    <script>
+        /* Progressive enhancement: mirror the chosen seat into the checkout box.
+           The listener is bound to this form, which HTMX replaces wholesale on
+           every swap, so no listeners are left behind. Resolving the form from
+           the running script avoids binding to the outgoing form during a swap. */
+        (function () {
+            var current = document.currentScript;
+            var form = current
+                ? current.closest(".reservation")
+                : document.querySelector(".reservation");
+            if (!form) {
+                return;
+            }
+            var output = form.querySelector(".checkout__seat");
+
+            function update() {
+                var checked = form.querySelector('input[name="seat"]:checked');
+                output.textContent = checked ? checked.dataset.code : "not chosen yet";
+                form.classList.toggle("reservation--chosen", Boolean(checked));
+            }
+
+            form.addEventListener("change", update);
+            update();
+        })();
+    </script>
 </form>
