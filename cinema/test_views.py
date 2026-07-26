@@ -206,9 +206,9 @@ class TestBookingDetailsStep:
         seats = list(future_screening.seats.all()[:2])
         response = client.post(self._url(future_screening), booking_payload(seats))
         assert response.status_code == 302
-        reservation = seats[0].reservations.get(status="confirmed")
-        assert reservation.customer_name == "Ada Lovelace"
-        assert reservation.customer_email == "ada@example.com"
+        booking = seats[0].reservations.get(status="confirmed").booking
+        assert booking.customer_name == "Ada Lovelace"
+        assert booking.customer_email == "ada@example.com"
 
     def test_invalid_details_re_render_the_step_without_booking(
         self, client, future_screening
@@ -284,17 +284,17 @@ class TestReserveSeats:
         seat.refresh_from_db()
         assert response.status_code == 302
         assert seat.is_available is False
-        reservation = seat.reservations.get(status="confirmed")
-        assert response.url == reverse(
-            "booking-confirmation", args=[reservation.group_id]
-        )
+        booking = seat.reservations.get(status="confirmed").booking
+        assert response.url == reverse("booking-confirmation", args=[booking.reference])
 
     def test_reserve_several_seats_creates_one_booking(self, client, future_screening):
         seats = list(future_screening.seats.all()[:4])
         response = client.post(self._url(future_screening), booking_payload(seats))
         assert response.status_code == 302
-        reservations = [seat.reservations.get(status="confirmed") for seat in seats]
-        assert len({r.group_id for r in reservations}) == 1
+        bookings = {
+            seat.reservations.get(status="confirmed").booking_id for seat in seats
+        }
+        assert len(bookings) == 1
 
     def test_reserve_at_the_limit_is_allowed(self, client, future_screening):
         seats = list(future_screening.seats.all()[:MAX_SEATS_PER_BOOKING])
@@ -311,8 +311,8 @@ class TestReserveSeats:
     def test_reserve_remembers_booking_in_session(self, client, future_screening):
         seat = future_screening.seats.first()
         client.post(self._url(future_screening), booking_payload([seat]))
-        reservation = seat.reservations.get(status="confirmed")
-        assert str(reservation.group_id) in client.session["booking_group_ids"]
+        booking = seat.reservations.get(status="confirmed").booking
+        assert str(booking.reference) in client.session["booking_references"]
 
     def test_reserve_without_seat_shows_error(self, client, future_screening):
         response = client.post(self._url(future_screening), {})
@@ -361,11 +361,11 @@ class TestReserveSeatsHtmx:
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
-        reservation = seats[0].reservations.get(status="confirmed")
+        booking = seats[0].reservations.get(status="confirmed").booking
         assert response["HX-Redirect"] == reverse(
-            "booking-confirmation", args=[reservation.group_id]
+            "booking-confirmation", args=[booking.reference]
         )
-        assert str(reservation.group_id) in client.session["booking_group_ids"]
+        assert str(booking.reference) in client.session["booking_references"]
 
     def test_htmx_without_seat_returns_partial_error(self, client, future_screening):
         response = client.post(self._url(future_screening), {}, HTTP_HX_REQUEST="true")
@@ -407,9 +407,9 @@ class TestBookingConfirmation:
             reverse("reserve-seats", args=[future_screening.id]),
             booking_payload(seats),
         )
-        group_id = seats[0].reservations.get(status="confirmed").group_id
+        reference = seats[0].reservations.get(status="confirmed").booking.reference
 
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        response = client.get(reverse("booking-confirmation", args=[reference]))
         assert response.status_code == 200
         for seat in seats:
             assert f"{seat.row}{seat.number}".encode() in response.content
@@ -422,9 +422,9 @@ class TestBookingConfirmation:
             reverse("reserve-seats", args=[future_screening.id]),
             booking_payload(seats),
         )
-        group_id = seats[0].reservations.get(status="confirmed").group_id
+        reference = seats[0].reservations.get(status="confirmed").booking.reference
 
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        response = client.get(reverse("booking-confirmation", args=[reference]))
 
         assert b"Ada Lovelace" in response.content
         assert b"ada@example.com" in response.content
@@ -447,18 +447,18 @@ class TestCancelBooking:
             reverse("reserve-seats", args=[screening.id]),
             booking_payload(seats),
         )
-        return seats, seats[0].reservations.get(status="confirmed").group_id
+        return seats, seats[0].reservations.get(status="confirmed").booking.reference
 
     def test_cancel_frees_every_seat_in_the_booking(self, client, future_screening):
-        seats, group_id = self._book(client, future_screening)
-        response = client.post(reverse("cancel-booking", args=[group_id]))
+        seats, reference = self._book(client, future_screening)
+        response = client.post(reverse("cancel-booking", args=[reference]))
         assert response.status_code == 302
         assert response.url == reverse("my-bookings")
         assert all(seat.is_available is True for seat in seats)
 
     def test_cancelled_seats_can_be_booked_again(self, client, future_screening):
-        seats, group_id = self._book(client, future_screening)
-        client.post(reverse("cancel-booking", args=[group_id]))
+        seats, reference = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[reference]))
 
         client.post(
             reverse("reserve-seats", args=[future_screening.id]),
@@ -467,33 +467,33 @@ class TestCancelBooking:
         assert all(seat.is_available is False for seat in seats)
 
     def test_get_does_not_cancel(self, client, future_screening):
-        seats, group_id = self._book(client, future_screening)
-        response = client.get(reverse("cancel-booking", args=[group_id]))
+        seats, reference = self._book(client, future_screening)
+        response = client.get(reverse("cancel-booking", args=[reference]))
         assert response.status_code == 405
         assert all(seat.is_available is False for seat in seats)
 
     def test_cannot_cancel_a_booking_from_another_session(
         self, client, django_client_factory, future_screening
     ):
-        seats, group_id = self._book(client, future_screening)
+        seats, reference = self._book(client, future_screening)
 
         stranger = django_client_factory()
-        response = stranger.post(reverse("cancel-booking", args=[group_id]))
+        response = stranger.post(reverse("cancel-booking", args=[reference]))
 
         assert response.status_code == 404
         assert all(seat.is_available is False for seat in seats)
 
     def test_cancelling_twice_is_reported_not_crashed(self, client, future_screening):
-        _, group_id = self._book(client, future_screening)
-        client.post(reverse("cancel-booking", args=[group_id]))
-        response = client.post(reverse("cancel-booking", args=[group_id]), follow=True)
+        _, reference = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[reference]))
+        response = client.post(reverse("cancel-booking", args=[reference]), follow=True)
         assert response.status_code == 200
         assert b"not active" in response.content
 
     def test_htmx_cancel_returns_client_redirect(self, client, future_screening):
-        seats, group_id = self._book(client, future_screening)
+        seats, reference = self._book(client, future_screening)
         response = client.post(
-            reverse("cancel-booking", args=[group_id]), HTTP_HX_REQUEST="true"
+            reverse("cancel-booking", args=[reference]), HTTP_HX_REQUEST="true"
         )
         assert response.status_code == 200
         assert response["HX-Redirect"] == reverse("my-bookings")
@@ -502,16 +502,16 @@ class TestCancelBooking:
     def test_confirmation_offers_cancelling_to_the_booker(
         self, client, future_screening
     ):
-        _, group_id = self._book(client, future_screening)
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        _, reference = self._book(client, future_screening)
+        response = client.get(reverse("booking-confirmation", args=[reference]))
         assert b"Cancel booking" in response.content
 
     def test_confirmation_hides_cancelling_from_others(
         self, client, django_client_factory, future_screening
     ):
-        _, group_id = self._book(client, future_screening)
+        _, reference = self._book(client, future_screening)
         stranger = django_client_factory()
-        response = stranger.get(reverse("booking-confirmation", args=[group_id]))
+        response = stranger.get(reverse("booking-confirmation", args=[reference]))
         assert response.status_code == 200
         assert b"Cancel booking" not in response.content
 
@@ -521,17 +521,17 @@ class TestCancelBooking:
         """Regression: a booking whose first seat was cancelled on its own (the
         admin can do this) used to report itself cancelled and hide the cancel
         control, stranding the seats that were still sold."""
-        seats, group_id = self._book(client, future_screening, count=3)
+        seats, reference = self._book(client, future_screening, count=3)
         first = seats[0].reservations.get(status="confirmed")
         first.status = "cancelled"
         first.save(update_fields=["status"])
 
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        response = client.get(reverse("booking-confirmation", args=[reference]))
         assert b"Booking cancelled" not in response.content
         assert b"Cancel booking" in response.content
 
         # ...and cancelling then releases the seats that were still sold.
-        client.post(reverse("cancel-booking", args=[group_id]))
+        client.post(reverse("cancel-booking", args=[reference]))
         assert all(seat.is_available is True for seat in seats)
 
     def test_partly_cancelled_booking_still_lists_as_confirmed(
@@ -549,13 +549,13 @@ class TestCancelBooking:
         """The session check is not the only thing standing between a stranger
         and someone's seats: a cross-site POST carrying the victim's cookies
         has to be rejected by CSRF too."""
-        seats, group_id = self._book(client, future_screening)
+        seats, reference = self._book(client, future_screening)
 
         # Same session (so the ownership check passes), but no CSRF token.
         forged = Client(enforce_csrf_checks=True)
         forged.cookies = client.cookies
 
-        response = forged.post(reverse("cancel-booking", args=[group_id]))
+        response = forged.post(reverse("cancel-booking", args=[reference]))
 
         assert response.status_code == 403
         assert all(seat.is_available is False for seat in seats)
@@ -563,9 +563,9 @@ class TestCancelBooking:
     def test_confirmation_shows_a_cancelled_booking_as_cancelled(
         self, client, future_screening
     ):
-        _, group_id = self._book(client, future_screening)
-        client.post(reverse("cancel-booking", args=[group_id]))
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        _, reference = self._book(client, future_screening)
+        client.post(reverse("cancel-booking", args=[reference]))
+        response = client.get(reverse("booking-confirmation", args=[reference]))
         assert response.status_code == 200
         assert b"Booking cancelled" in response.content
         assert b"Cancel booking" not in response.content

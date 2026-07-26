@@ -161,3 +161,9 @@ if not DEBUG and RENDER_EXTERNAL_HOSTNAME:
     SECURE_HSTS_SECONDS = 3600
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Where Django's auth views send people. Booking never requires an account, so
+# these only matter for the member pages.
+LOGIN_URL = "log-in"
+LOGIN_REDIRECT_URL = "movie-list"
+LOGOUT_REDIRECT_URL = "movie-list"

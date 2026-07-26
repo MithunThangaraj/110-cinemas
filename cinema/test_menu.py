@@ -128,10 +128,9 @@ class TestParseItemQuantities:
 class TestBookingWithFood:
     def test_items_are_attached_to_the_booking(self, future_screening, popcorn, cola):
         seat = future_screening.seats.first()
-        reservations = create_booking([seat.id], items=[(popcorn, 2), (cola, 1)])
-        group_id = reservations[0].group_id
+        booking = create_booking([seat.id], items=[(popcorn, 2), (cola, 1)])
 
-        lines = BookingItem.objects.filter(group_id=group_id)
+        lines = BookingItem.objects.filter(booking=booking)
         assert lines.count() == 2
         assert sum(line.line_total for line in lines) == 700 * 2 + 450
 
@@ -139,21 +138,19 @@ class TestBookingWithFood:
         self, future_screening, popcorn
     ):
         seat = future_screening.seats.first()
-        reservations = create_booking([seat.id], items=[(popcorn, 2)])
+        booking = create_booking([seat.id], items=[(popcorn, 2)])
 
         popcorn.price = 5000
         popcorn.save(update_fields=["price"])
 
-        line = BookingItem.objects.get(group_id=reservations[0].group_id)
+        line = BookingItem.objects.get(booking=booking)
         assert line.unit_price == 700
         assert line.line_total == 1400
 
     def test_booking_without_food_has_no_lines(self, future_screening):
         seat = future_screening.seats.first()
-        reservations = create_booking([seat.id])
-        assert not BookingItem.objects.filter(
-            group_id=reservations[0].group_id
-        ).exists()
+        booking = create_booking([seat.id])
+        assert not BookingItem.objects.filter(booking=booking).exists()
 
 
 @pytest.mark.django_db
@@ -190,10 +187,10 @@ class TestFoodInTheBookingFlow:
                 f"item_{popcorn.id}": "2",
             },
         )
-        group_id = seat.reservations.get(status="confirmed").group_id
-        assert BookingItem.objects.filter(group_id=group_id).count() == 1
+        booking = seat.reservations.get(status="confirmed").booking
+        assert BookingItem.objects.filter(booking=booking).count() == 1
 
-        response = client.get(reverse("booking-confirmation", args=[group_id]))
+        response = client.get(reverse("booking-confirmation", args=[booking.reference]))
         body = response.content.decode()
         assert "2 &times; Salted popcorn (L)" in body or "2 × Salted popcorn" in body
         # 2,000 seat + 1,400 popcorn.
@@ -211,5 +208,5 @@ class TestFoodInTheBookingFlow:
             },
         )
         assert response.status_code == 302
-        group_id = seat.reservations.get(status="confirmed").group_id
-        assert not BookingItem.objects.filter(group_id=group_id).exists()
+        booking = seat.reservations.get(status="confirmed").booking
+        assert not BookingItem.objects.filter(booking=booking).exists()

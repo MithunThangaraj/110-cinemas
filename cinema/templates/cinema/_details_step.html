@@ -13,6 +13,7 @@ and the view returns them to the seat map.
     hx-target="this"
     hx-swap="outerHTML"
     data-seats-total="{{ selected_total }}"
+    data-discount="{{ discount }}"
 >
     {% csrf_token %}
     {% for seat in selected_seats %}
@@ -83,6 +84,18 @@ and the view returns them to the seat map.
     </fieldset>
     {% endif %}
 
+    {% if discount %}
+    <p class="details__total details__total--discount">
+        <span>Member discount</span>
+        <span class="checkout__price">&minus;&yen;{{ discount|intcomma }}</span>
+    </p>
+    {% else %}
+    <p class="details__member-prompt">
+        <a href="{% url 'sign-up' %}">Create a free account</a> to save
+        &yen;{{ member_discount|intcomma }} on this booking, or carry on as a guest.
+    </p>
+    {% endif %}
+
     <p class="details__grand-total">
         <span>Total</span>
         <strong class="details__grand-total-value">&yen;{{ grand_total|intcomma }}</strong>
@@ -113,6 +126,7 @@ and the view returns them to the seat map.
             }
 
             var seatsTotal = parseInt(form.dataset.seatsTotal, 10) || 0;
+            var discount = parseInt(form.dataset.discount, 10) || 0;
             var extrasOutput = form.querySelector(".extras__total");
             var grandOutput = form.querySelector(".details__grand-total-value");
             var boxes = Array.prototype.slice.call(
@@ -135,7 +149,9 @@ and the view returns them to the seat map.
                     return sum + quantity * parseInt(box.dataset.price, 10);
                 }, 0);
                 extrasOutput.textContent = yen(extras);
-                grandOutput.textContent = yen(seatsTotal + extras);
+                grandOutput.textContent = yen(
+                    Math.max(seatsTotal + extras - discount, 0)
+                );
             }
 
             form.addEventListener("input", update);

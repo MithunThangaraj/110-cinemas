@@ -76,6 +76,28 @@ uv run black .          # format
 
 ## How it works
 
+### The data model
+
+![110 Cinemas database schema](docs/schema.png)
+
+Seven tables. The chain runs **movie + auditorium → screening → seat →
+reservation**, with `booking` tying a visit together and `menuitem →
+bookingitem` for the concession stand.
+
+Two things on there are worth knowing about:
+
+- **The `on_delete` rules are deliberate.** Deleting a movie cascades away its
+  screenings and seats, which are meaningless without it. But an auditorium
+  with screenings, or a menu item somebody has ordered, is `PROTECT`ed —
+  deleting either would destroy booking history.
+- **A seat cannot be double-booked, by the database.** The partial unique index
+  `(seat_id, status) WHERE status = 'confirmed'` allows any number of cancelled
+  rows per seat but only one confirmed, which is also what lets a cancelled
+  seat be sold again.
+
+The source is [`docs/schema.puml`](docs/schema.puml); re-render it with the
+command in [`docs/README.md`](docs/README.md) if the models change.
+
 ### Auditoriums, seat maps and prices
 
 A screening runs in an **`Auditorium`**, whose format decides both its seat map
@@ -101,6 +123,17 @@ screening is ¥2,000 + ¥1,000 + ¥500 = **¥3,500**.
 Every layout includes **wheelchair spaces**, marked on the map. They are never
 sold at the premium rate, even when they sit inside the premium block.
 
+### Accounts
+
+Accounts are free and entirely optional. A member gets **¥500 off a booking**
+and keeps their booking history; a guest books with no account at all and sees
+their bookings for as long as the browser session lasts.
+
+The discount is recorded on the `Booking` row rather than recomputed when the
+page is rendered, so changing the offer cannot rewrite what a past booking
+cost — the same reasoning as `BookingItem.unit_price`. It applies once per
+booking, not per seat, and the total never goes below zero.
+
 ### Booking
 
 Booking is two steps and needs no account:
@@ -108,20 +141,20 @@ Booking is two steps and needs no account:
 1. **Choose seats** — up to 6, on the map.
 2. **Say who it is for** — a name and email, then confirm.
 
-The chosen seats travel with the form as hidden inputs rather than sitting in
-the session, so a stale tab cannot book seats you have forgotten about. Nothing
-is held while you type: if a seat goes in the meantime the booking fails
+A member's details are filled in for them. The chosen seats travel with the
+form as hidden inputs rather than sitting in the session, so a stale tab cannot
+book seats you have forgotten about. Nothing is held while you type: if a seat goes in the meantime the booking fails
 cleanly and you are returned to the map.
 
-Seats booked together share a `group_id` and are reserved all-or-nothing: if
+Seats booked together belong to one `Booking` and are reserved all-or-nothing: if
 any one of them is taken, none are booked. The limit lives in
 [`cinema/services.py`](cinema/services.py) as `MAX_SEATS_PER_BOOKING` and is
 enforced on the server; the browser only mirrors it.
 
 A booking can be cancelled from the ticket or from **My Bookings**, which puts
-every seat back on sale. Because there are no accounts, a booking belongs to the
-browser session that made it: cancelling requires the booking's group ID to be
-in that session, so a leaked booking link cannot release someone else's seats.
+every seat back on sale. A booking belongs either to the member who made it or,
+for a guest, to the browser session that made it — cancelling requires one of
+those, so a leaked booking link cannot release someone else's seats.
 
 ### Food and drink
 
@@ -175,8 +208,8 @@ override either result.
 
 ```
 cinema/
-  models.py      Movie, Auditorium, Screening, Seat, Reservation,
-                 MenuItem, BookingItem
+  models.py      Movie, Auditorium, Screening, Seat,
+                 Booking, Reservation, MenuItem, BookingItem
   layouts.py     seat layout per screen format
   services.py    booking, cancelling, availability - the business rules
   views.py       thin views; HTMX partials for the seat map

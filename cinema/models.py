@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -198,10 +199,66 @@ class MenuItem(models.Model):
         return self.name
 
 
+class Booking(models.Model):
+    """One visit: the seats reserved together, plus anything ordered with them.
+
+    Guests book without an account, so `user` is optional; a signed-in member's
+    bookings follow them instead of living in one browser session.
+    """
+
+    # Members get this off a booking. Stored on the booking rather than
+    # recomputed, so changing the offer cannot rewrite what past bookings cost.
+    MEMBER_DISCOUNT = 500
+
+    reference = models.UUIDField(default=uuid.uuid4, unique=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="bookings",
+    )
+    customer_name = models.CharField(max_length=255, blank=True, default="")
+    customer_email = models.EmailField(blank=True, default="")
+    discount = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Booking {self.reference}"
+
+    @property
+    def seats_total(self):
+        return sum(reservation.seat.price for reservation in self.reservations.all())
+
+    @property
+    def items_total(self):
+        return sum(line.line_total for line in self.items.all())
+
+    @property
+    def total(self):
+        """What the visitor pays, never below zero."""
+        return max(self.seats_total + self.items_total - self.discount, 0)
+
+    @property
+    def status(self):
+        """Confirmed while any seat in it still is.
+
+        Taking one reservation's status would mislabel a booking that was only
+        partly cancelled, which the admin can do.
+        """
+        statuses = [reservation.status for reservation in self.reservations.all()]
+        if Reservation.Status.CONFIRMED in statuses:
+            return Reservation.Status.CONFIRMED
+        return Reservation.Status.CANCELLED
+
+
 class BookingItem(models.Model):
     """A menu item added to a booking."""
 
-    group_id = models.UUIDField(db_index=True)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="items")
     item = models.ForeignKey(
         MenuItem, on_delete=models.PROTECT, related_name="booking_items"
     )
@@ -229,12 +286,9 @@ class Reservation(models.Model):
     seat = models.ForeignKey(
         Seat, on_delete=models.CASCADE, related_name="reservations"
     )
-    booking_id = models.UUIDField(default=uuid.uuid4, unique=True)
-    # Seats reserved together in one booking share a group_id, so a visitor can
-    # be shown (and can look up) their whole booking rather than one seat.
-    group_id = models.UUIDField(default=uuid.uuid4, db_index=True)
-    customer_name = models.CharField(max_length=255, blank=True, default="")
-    customer_email = models.EmailField(blank=True, default="")
+    booking = models.ForeignKey(
+        "Booking", on_delete=models.CASCADE, related_name="reservations"
+    )
     status = models.CharField(
         max_length=10,
         choices=Status.choices,
@@ -256,4 +310,4 @@ class Reservation(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Reservation {self.booking_id} - {self.seat} ({self.status})"
+        return f"{self.seat.label} on {self.booking} ({self.status})"

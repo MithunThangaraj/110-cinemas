@@ -1,17 +1,20 @@
 import hashlib
-import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 
-from .models import BookingItem, MenuItem, Reservation, Seat
+from .models import Booking, BookingItem, MenuItem, Reservation, Seat
 
 # How many seats one visitor may reserve in a single booking.
 MAX_SEATS_PER_BOOKING = 6
 
 # How many of any one menu item can go on a booking.
 MAX_ITEM_QUANTITY = 10
+
+# Session key under which a guest's bookings are remembered, so they can see
+# them without an account.
+SESSION_BOOKINGS_KEY = "booking_references"
 
 
 def validate_selection(seat_ids):
@@ -101,12 +104,13 @@ def parse_item_quantities(data, items):
 
 
 @transaction.atomic
-def create_booking(seat_ids, customer_name="", customer_email="", items=()):
+def create_booking(seat_ids, customer_name="", customer_email="", items=(), user=None):
     """Reserve several seats as one booking, or none of them at all.
 
-    `items` is [(MenuItem, quantity)] to add to the same booking.
+    `items` is [(MenuItem, quantity)] to add to the same booking. `user` is the
+    signed-in member, if any: guests book without an account.
 
-    Returns the created reservations, which all share a `group_id`.
+    Returns the `Booking`.
     """
     # dict.fromkeys de-duplicates while keeping the submitted order.
     seat_ids = list(dict.fromkeys(seat_ids))
@@ -131,36 +135,38 @@ def create_booking(seat_ids, customer_name="", customer_email="", items=()):
     ).exists():
         raise ValidationError("Some of those seats have already been reserved.")
 
-    group_id = uuid.uuid4()
-    reservations = [
-        Reservation.objects.create(
-            seat=seat,
-            group_id=group_id,
-            customer_name=customer_name,
-            customer_email=customer_email,
-        )
-        for seat in seats
-    ]
+    booking = Booking.objects.create(
+        user=user,
+        customer_name=customer_name,
+        customer_email=customer_email,
+        # Recorded on the booking, not recomputed later, so changing the offer
+        # cannot rewrite what a past booking cost.
+        discount=Booking.MEMBER_DISCOUNT if user is not None else 0,
+    )
+
+    for seat in seats:
+        Reservation.objects.create(seat=seat, booking=booking)
 
     for item, quantity in items:
         BookingItem.objects.create(
-            group_id=group_id,
+            booking=booking,
             item=item,
             quantity=quantity,
             # Snapshot the price: the menu can change, this order cannot.
             unit_price=item.price,
         )
 
-    return reservations
+    return booking
 
 
 def reserve_seat(seat_id, customer_name="", customer_email=""):
     """Reserve a single seat. Thin wrapper around `create_booking`."""
-    return create_booking([seat_id], customer_name, customer_email)[0]
+    booking = create_booking([seat_id], customer_name, customer_email)
+    return booking.reservations.first()
 
 
 @transaction.atomic
-def cancel_booking(group_id):
+def cancel_booking(booking):
     """Cancel every confirmed seat in a booking, freeing all of them at once.
 
     Cancelling only changes `status`, so the partial unique constraint on
@@ -172,7 +178,7 @@ def cancel_booking(group_id):
     """
     reservations = list(
         Reservation.objects.select_for_update().filter(
-            group_id=group_id, status=Reservation.Status.CONFIRMED
+            booking=booking, status=Reservation.Status.CONFIRMED
         )
     )
     if not reservations:
@@ -184,10 +190,39 @@ def cancel_booking(group_id):
     return reservations
 
 
-def booking_extras(group_id):
-    """The menu items added to a booking, and what they came to."""
-    lines = list(BookingItem.objects.filter(group_id=group_id).select_related("item"))
-    return lines, sum(line.line_total for line in lines)
+def bookings_for(request):
+    """The bookings this visitor may see.
+
+    A signed-in member sees everything they have ever booked; a guest sees only
+    what this browser session made, since there is no account to tie it to.
+    """
+    query = Booking.objects.prefetch_related(
+        "items__item",
+        "reservations__seat__screening__movie",
+        "reservations__seat__screening__auditorium",
+    )
+    if request.user.is_authenticated:
+        return query.filter(user=request.user)
+    references = request.session.get(SESSION_BOOKINGS_KEY, [])
+    return query.filter(reference__in=references)
+
+
+def may_cancel(request, booking):
+    """Whether this visitor is allowed to cancel this booking.
+
+    References are UUIDs in the URL, so without this anyone holding a link
+    could release someone else's seats.
+    """
+    if request.user.is_authenticated and booking.user_id == request.user.id:
+        return True
+    return str(booking.reference) in request.session.get(SESSION_BOOKINGS_KEY, [])
+
+
+def remember_booking(request, booking):
+    """Let a guest find this booking again later in the same session."""
+    references = request.session.setdefault(SESSION_BOOKINGS_KEY, [])
+    references.append(str(booking.reference))
+    request.session.modified = True
 
 
 def menu_by_category():

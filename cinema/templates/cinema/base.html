@@ -40,6 +40,18 @@
                     </li>
                 </ul>
             </nav>
+            <div class="site-account">
+                {% if user.is_authenticated %}
+                <span class="site-account__name">{{ user.username }}</span>
+                <form method="post" action="{% url 'log-out' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button--ghost button--small">Log out</button>
+                </form>
+                {% else %}
+                <a class="site-account__link" href="{% url 'log-in' %}">Log in</a>
+                <a class="button button--small" href="{% url 'sign-up' %}">Sign up free</a>
+                {% endif %}
+            </div>
         </div>
     </header>
 

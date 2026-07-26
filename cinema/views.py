@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import login
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -6,25 +7,23 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import HttpResponseClientRedirect
 
-from .forms import MovieSearchForm, ReservationForm
-from .models import MenuItem, Movie, Reservation, Screening
+from .forms import MovieSearchForm, ReservationForm, SignUpForm
+from .models import Booking, MenuItem, Movie, Screening
 from .services import (
     MAX_ITEM_QUANTITY,
     MAX_SEATS_PER_BOOKING,
     availability_signature,
-    booking_extras,
+    bookings_for,
     cancel_booking,
     create_booking,
+    may_cancel,
     menu_by_category,
     parse_item_quantities,
+    remember_booking,
     seat_rows,
     seats_with_availability,
     validate_selection,
 )
-
-# Session key under which we remember the bookings made in the current visit,
-# so a visitor can see "My Bookings" without needing an account.
-SESSION_BOOKINGS_KEY = "booking_group_ids"
 
 
 def _parse_int(value):
@@ -44,6 +43,29 @@ def movie_list(request):
     if form.is_valid() and form.cleaned_data["q"]:
         movies = movies.filter(title__icontains=form.cleaned_data["q"])
     return render(request, "cinema/movie_list.html", {"movies": movies, "form": form})
+
+
+def sign_up(request):
+    """Create a free membership and sign straight in."""
+    if request.user.is_authenticated:
+        return redirect("movie-list")
+
+    form = SignUpForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        user = form.save()
+        login(request, user)
+        messages.success(
+            request,
+            f"Welcome to 110 Cinemas. Members save "
+            f"\u00a5{Booking.MEMBER_DISCOUNT} on every booking.",
+        )
+        return redirect("movie-list")
+
+    return render(
+        request,
+        "cinema/sign_up.html",
+        {"form": form, "discount": Booking.MEMBER_DISCOUNT},
+    )
 
 
 def menu(request):
@@ -133,12 +155,15 @@ def _render_details_step(request, screening, seats, form, chosen_items=()):
 
     seats_total = sum(seat.price for seat in seats)
     extras_total = sum(item.price * quantity for item, quantity in chosen_items)
+    discount = Booking.MEMBER_DISCOUNT if request.user.is_authenticated else 0
     context = {
         "screening": screening,
         "selected_seats": seats,
         "selected_total": seats_total,
         "extras_total": extras_total,
-        "grand_total": seats_total + extras_total,
+        "discount": discount,
+        "member_discount": Booking.MEMBER_DISCOUNT,
+        "grand_total": max(seats_total + extras_total - discount, 0),
         "menu": menu,
         "max_item_quantity": MAX_ITEM_QUANTITY,
         "form": form,
@@ -201,9 +226,16 @@ def reserve_seats(request, screening_id):
     chosen_items = parse_item_quantities(request.POST, available_items)
 
     if step != "details":
-        # Seats chosen; ask who they are for and offer the menu.
+        # Seats chosen; ask who they are for and offer the menu. A signed-in
+        # member should not have to retype what we already know.
+        initial = {}
+        if request.user.is_authenticated:
+            initial = {
+                "customer_name": request.user.get_full_name() or request.user.username,
+                "customer_email": request.user.email,
+            }
         return _render_details_step(
-            request, screening, seats, ReservationForm(), chosen_items
+            request, screening, seats, ReservationForm(initial=initial), chosen_items
         )
 
     form = ReservationForm(request.POST)
@@ -211,11 +243,12 @@ def reserve_seats(request, screening_id):
         return _render_details_step(request, screening, seats, form, chosen_items)
 
     try:
-        reservations = create_booking(
+        booking = create_booking(
             [seat.id for seat in seats],
             customer_name=form.cleaned_data["customer_name"],
             customer_email=form.cleaned_data["customer_email"],
             items=chosen_items,
+            user=request.user if request.user.is_authenticated else None,
         )
     except ValidationError as error:
         # Seats are not held while the visitor types, so one may have gone.
@@ -229,90 +262,59 @@ def reserve_seats(request, screening_id):
             ),
         )
 
-    group_id = str(reservations[0].group_id)
-    group_ids = request.session.setdefault(SESSION_BOOKINGS_KEY, [])
-    group_ids.append(group_id)
-    request.session.modified = True
+    remember_booking(request, booking)
 
-    confirmation_url = reverse("booking-confirmation", args=[group_id])
+    confirmation_url = reverse("booking-confirmation", args=[booking.reference])
     if request.htmx:
         return HttpResponseClientRedirect(confirmation_url)
 
-    count = len(reservations)
+    count = len(seats)
     messages.success(request, f"Reserved {count} seat{'' if count == 1 else 's'}.")
     return redirect(confirmation_url)
 
 
-def _booking_status(reservations):
-    """A booking counts as confirmed while any of its seats still is.
-
-    Taking the status of one reservation would mislabel a booking that was only
-    partly cancelled (which the admin can do), hiding the cancel control while
-    seats were still sold.
-    """
-    if any(r.status == Reservation.Status.CONFIRMED for r in reservations):
-        return Reservation.Status.CONFIRMED
-    return Reservation.Status.CANCELLED
-
-
-def _booked_in_this_session(request, group_id):
-    """Whether this visitor made the booking.
-
-    Booking references are UUIDs in the URL, so without this check anyone who
-    got hold of a link could cancel someone else's seats.
-    """
-    return str(group_id) in request.session.get(SESSION_BOOKINGS_KEY, [])
-
-
-def booking_confirmation(request, group_id):
-    reservations = list(
-        Reservation.objects.filter(group_id=group_id)
-        .select_related(
-            "seat",
-            "seat__screening",
-            "seat__screening__movie",
-            "seat__screening__auditorium",
-        )
-        .order_by("seat__row", "seat__number")
+def _booking_or_404(reference):
+    return get_object_or_404(
+        Booking.objects.prefetch_related(
+            "items__item",
+            "reservations__seat__screening__movie",
+            "reservations__seat__screening__auditorium",
+        ),
+        reference=reference,
     )
-    if not reservations:
-        raise Http404("No booking with that reference.")
 
-    screening = reservations[0].seat.screening
-    status = _booking_status(reservations)
-    extras, extras_total = booking_extras(group_id)
-    seats_total = sum(reservation.seat.price for reservation in reservations)
+
+def booking_confirmation(request, reference):
+    booking = _booking_or_404(reference)
+    reservations = sorted(
+        booking.reservations.all(),
+        key=lambda reservation: (reservation.seat.row, reservation.seat.number),
+    )
     return render(
         request,
         "cinema/booking_confirmation.html",
         {
-            "group_id": group_id,
-            "reservations": reservations,
-            "screening": screening,
+            "booking": booking,
+            "screening": reservations[0].seat.screening,
             "seats": [reservation.seat for reservation in reservations],
-            "total": seats_total,
-            "extras": extras,
-            "extras_total": extras_total,
-            "grand_total": seats_total + extras_total,
-            "booked_by": reservations[0].customer_name,
-            "booked_email": reservations[0].customer_email,
-            "status": status,
             "can_cancel": (
-                status == "confirmed" and _booked_in_this_session(request, group_id)
+                booking.status == "confirmed" and may_cancel(request, booking)
             ),
         },
     )
 
 
 @require_POST
-def cancel_booking_view(request, group_id):
+def cancel_booking_view(request, reference):
+    booking = _booking_or_404(reference)
+
     # 404 rather than 403: a visitor should not be able to probe which booking
     # references exist.
-    if not _booked_in_this_session(request, group_id):
+    if not may_cancel(request, booking):
         raise Http404("No booking with that reference.")
 
     try:
-        reservations = cancel_booking(group_id)
+        reservations = cancel_booking(booking)
     except ValidationError as error:
         messages.error(request, error.messages[0])
     else:
@@ -329,42 +331,9 @@ def cancel_booking_view(request, group_id):
     return redirect(url)
 
 
-def _group_into_bookings(reservations):
-    """Collapse per-seat reservations into one entry per booking."""
-    bookings = {}
-    for reservation in reservations:
-        booking = bookings.setdefault(
-            reservation.group_id,
-            {
-                "group_id": reservation.group_id,
-                "screening": reservation.seat.screening,
-                "created_at": reservation.created_at,
-                "reservations": [],
-                "seats": [],
-            },
-        )
-        booking["reservations"].append(reservation)
-        booking["seats"].append(reservation.seat)
-
-    for booking in bookings.values():
-        booking["status"] = _booking_status(booking["reservations"])
-    return sorted(bookings.values(), key=lambda b: b["created_at"], reverse=True)
-
-
 def my_bookings(request):
-    group_ids = request.session.get(SESSION_BOOKINGS_KEY, [])
-    reservations = (
-        Reservation.objects.filter(group_id__in=group_ids)
-        .select_related(
-            "seat",
-            "seat__screening",
-            "seat__screening__movie",
-            "seat__screening__auditorium",
-        )
-        .order_by("seat__row", "seat__number")
-    )
     return render(
         request,
         "cinema/my_bookings.html",
-        {"bookings": _group_into_bookings(reservations)},
+        {"bookings": bookings_for(request)},
     )

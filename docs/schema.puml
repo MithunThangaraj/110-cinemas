@@ -1,0 +1,138 @@
+@startuml
+!theme plain
+left to right direction
+
+title 110 Cinemas — Database Schema
+
+skinparam backgroundColor #FFFFFF
+skinparam roundCorner 6
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #444444
+}
+skinparam ArrowColor #333333
+
+entity "movie" as movie #E8F0FE {
+  * id : integer <<PK>>
+  --
+  title : varchar(255)
+  description : text
+  release_date : date
+  runtime_minutes : integer
+  poster_image : varchar(200)
+}
+
+entity "auditorium" as auditorium #E8F0FE {
+  * id : integer <<PK>>
+  --
+  name : varchar(100) <<unique>>
+  screen_format : varchar(20)
+  surcharge : integer
+}
+
+entity "screening" as screening #FFF4E5 {
+  * id : integer <<PK>>
+  --
+  * movie_id : bigint <<FK>>
+  * auditorium_id : bigint <<FK>>
+  start_time : datetime
+  base_price : integer
+}
+
+entity "seat" as seat #FFF4E5 {
+  * id : integer <<PK>>
+  --
+  * screening_id : bigint <<FK>>
+  row : varchar(10)
+  number : integer
+  kind : varchar(20)
+  --
+  unique (screening_id, row, number)
+}
+
+entity "booking" as booking #F3E8FF {
+  * id : integer <<PK>>
+  --
+  reference : uuid <<unique>>
+  user_id : bigint <<FK, null>>
+  customer_name : varchar(255)
+  customer_email : varchar(254)
+  discount : integer
+  created_at : datetime
+}
+
+entity "auth_user" as authuser #EEEEEE {
+  * id : integer <<PK>>
+  --
+  username : varchar(150) <<unique>>
+  email : varchar(254)
+  password : varchar(128)
+}
+
+entity "reservation" as reservation #FDE7EA {
+  * id : integer <<PK>>
+  --
+  * seat_id : bigint <<FK>>
+  * booking_id : bigint <<FK>>
+  status : varchar(10)
+  created_at : datetime
+  --
+  unique (seat_id, status)
+  where status = 'confirmed'
+}
+
+entity "menuitem" as menuitem #E6F4EA {
+  * id : integer <<PK>>
+  --
+  name : varchar(100) <<unique>>
+  description : varchar(255)
+  category : varchar(20)
+  price : integer
+  image_url : varchar(200)
+  image_credit : varchar(255)
+  image_source : varchar(255)
+  is_available : bool
+  sort_order : integer
+}
+
+entity "bookingitem" as bookingitem #E6F4EA {
+  * id : integer <<PK>>
+  --
+  * item_id : bigint <<FK>>
+  * booking_id : bigint <<FK>>
+  quantity : smallint
+  unit_price : integer
+}
+
+movie ||--o{ screening : shows
+auditorium ||--o{ screening : hosts
+screening ||--o{ seat : "lays out"
+seat ||--o{ reservation : "booked by"
+menuitem ||--o{ bookingitem : "ordered as"
+
+authuser ||--o{ booking : "member (optional)"
+booking ||--o{ reservation : "seats"
+booking ||--o{ bookingitem : "food"
+
+note bottom of reservation
+  The partial unique index allows many
+  cancelled rows per seat, but only one
+  confirmed — so a seat cannot be
+  double-booked, and a cancelled seat
+  can be sold again.
+end note
+
+note bottom of booking
+  user is null for a guest: booking never
+  requires an account. discount is stored,
+  not recomputed, so changing the member
+  offer cannot rewrite past bookings.
+end note
+
+note bottom of bookingitem
+  unit_price is a snapshot: repricing
+  the menu cannot change what an
+  existing booking cost.
+end note
+
+@enduml

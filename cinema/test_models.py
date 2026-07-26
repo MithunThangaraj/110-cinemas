@@ -10,6 +10,7 @@ from .layouts import LAYOUTS
 from .models import (
     POSTER_THEMES,
     Auditorium,
+    Booking,
     Movie,
     Reservation,
     Screening,
@@ -166,7 +167,7 @@ class TestSeat:
 
     def test_seat_not_available_when_reserved(self, future_screening):
         seat = future_screening.seats.first()
-        Reservation.objects.create(seat=seat)
+        reserve_seat(seat.id)
         assert seat.is_available is False
 
 
@@ -174,23 +175,26 @@ class TestSeat:
 class TestReservation:
     def test_create_reservation(self, future_screening):
         seat = future_screening.seats.first()
-        reservation = Reservation.objects.create(seat=seat)
+        reservation = reserve_seat(seat.id)
         assert reservation.status == "confirmed"
-        assert isinstance(reservation.booking_id, uuid.UUID)
+        assert isinstance(reservation.booking.reference, uuid.UUID)
 
     def test_unique_active_reservation(self, future_screening):
+        """The database itself refuses a second confirmed booking of a seat."""
         seat = future_screening.seats.first()
-        Reservation.objects.create(seat=seat)
+        booking = Booking.objects.create()
+        Reservation.objects.create(seat=seat, booking=booking)
         with pytest.raises(IntegrityError):
-            Reservation.objects.create(seat=seat)
+            Reservation.objects.create(seat=seat, booking=booking)
 
     def test_cancelled_reservation_allows_new(self, future_screening):
         seat = future_screening.seats.first()
-        r1 = Reservation.objects.create(seat=seat)
-        r1.status = "cancelled"
-        r1.save(update_fields=["status"])
-        r2 = Reservation.objects.create(seat=seat)
-        assert r2.status == "confirmed"
+        booking = Booking.objects.create()
+        first = Reservation.objects.create(seat=seat, booking=booking)
+        first.status = "cancelled"
+        first.save(update_fields=["status"])
+        second = Reservation.objects.create(seat=seat, booking=booking)
+        assert second.status == "confirmed"
 
 
 @pytest.mark.django_db
@@ -210,14 +214,14 @@ class TestServices:
     def test_cancel_booking_marks_the_reservation_cancelled(self, future_screening):
         seat = future_screening.seats.first()
         reservation = reserve_seat(seat.id)
-        cancel_booking(reservation.group_id)
+        cancel_booking(reservation.booking)
         reservation.refresh_from_db()
         assert reservation.status == "cancelled"
 
     def test_seat_available_after_cancel(self, future_screening):
         seat = future_screening.seats.first()
         reservation = reserve_seat(seat.id)
-        cancel_booking(reservation.group_id)
+        cancel_booking(reservation.booking)
         assert seat.is_available is True
 
     def test_available_seats_query_excludes_reserved(self, future_screening):
@@ -236,20 +240,19 @@ class TestServices:
 class TestCreateBooking:
     def test_seats_booked_together_share_a_group(self, future_screening):
         seats = list(future_screening.seats.all()[:3])
-        reservations = create_booking([seat.id for seat in seats])
-        assert len(reservations) == 3
-        assert len({r.group_id for r in reservations}) == 1
+        booking = create_booking([seat.id for seat in seats])
+        assert booking.reservations.count() == 3
 
     def test_separate_bookings_get_separate_groups(self, future_screening):
         seats = list(future_screening.seats.all()[:2])
         first = create_booking([seats[0].id])
         second = create_booking([seats[1].id])
-        assert first[0].group_id != second[0].group_id
+        assert first.reference != second.reference
 
     def test_duplicate_seat_ids_are_booked_once(self, future_screening):
         seat = future_screening.seats.first()
-        reservations = create_booking([seat.id, seat.id])
-        assert len(reservations) == 1
+        booking = create_booking([seat.id, seat.id])
+        assert booking.reservations.count() == 1
 
     def test_empty_selection_is_rejected(self, future_screening):
         with pytest.raises(ValidationError):
@@ -262,8 +265,8 @@ class TestCreateBooking:
 
     def test_exactly_the_limit_is_allowed(self, future_screening):
         seats = list(future_screening.seats.all()[:MAX_SEATS_PER_BOOKING])
-        reservations = create_booking([seat.id for seat in seats])
-        assert len(reservations) == MAX_SEATS_PER_BOOKING
+        booking = create_booking([seat.id for seat in seats])
+        assert booking.reservations.count() == MAX_SEATS_PER_BOOKING
 
     def test_unknown_seat_id_is_rejected(self, future_screening):
         seat = future_screening.seats.first()
@@ -272,9 +275,9 @@ class TestCreateBooking:
 
     def test_cancel_booking_cancels_every_seat(self, future_screening):
         seats = list(future_screening.seats.all()[:3])
-        reservations = create_booking([seat.id for seat in seats])
+        booking = create_booking([seat.id for seat in seats])
 
-        cancelled = cancel_booking(reservations[0].group_id)
+        cancelled = cancel_booking(booking)
 
         assert len(cancelled) == 3
         assert all(seat.is_available for seat in seats)
@@ -284,22 +287,23 @@ class TestCreateBooking:
         mine = create_booking([seats[0].id])
         theirs = create_booking([seats[1].id])
 
-        cancel_booking(mine[0].group_id)
+        cancel_booking(mine)
 
-        theirs[0].refresh_from_db()
-        assert theirs[0].status == "confirmed"
+        theirs_reservation = theirs.reservations.first()
+        theirs_reservation.refresh_from_db()
+        assert theirs_reservation.status == "confirmed"
         assert seats[1].is_available is False
 
     def test_cancel_booking_twice_is_rejected(self, future_screening):
         seat = future_screening.seats.first()
-        reservations = create_booking([seat.id])
-        cancel_booking(reservations[0].group_id)
+        booking = create_booking([seat.id])
+        cancel_booking(booking)
         with pytest.raises(ValidationError):
-            cancel_booking(reservations[0].group_id)
+            cancel_booking(booking)
 
     def test_cancel_unknown_booking_is_rejected(self):
         with pytest.raises(ValidationError):
-            cancel_booking(uuid.uuid4())
+            cancel_booking(Booking.objects.create())
 
     def test_one_taken_seat_books_none_of_them(self, future_screening):
         seats = list(future_screening.seats.all()[:3])

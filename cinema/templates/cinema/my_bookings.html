@@ -1,31 +1,42 @@
 {% extends "cinema/base.html" %}
+{% load humanize %}
 
 {% block title %}My Bookings - 110 Cinemas{% endblock %}
 
 {% block content %}
 <h2 class="page-title">My Bookings</h2>
-<p class="page-lead">Bookings you made in this browser session.</p>
+<p class="page-lead">
+    {% if user.is_authenticated %}
+    Everything you have booked.
+    {% else %}
+    Bookings you made in this browser session.
+    <a href="{% url 'sign-up' %}">Create a free account</a> to keep them.
+    {% endif %}
+</p>
 
 <ul class="booking-list">
     {% for booking in bookings %}
     <li class="booking-row">
-        <a class="booking" href="{% url 'booking-confirmation' booking.group_id %}">
+        <a class="booking" href="{% url 'booking-confirmation' booking.reference %}">
             <span class="booking__seats">
-                {% for seat in booking.seats %}<span class="booking__seat">{{ seat.row }}{{ seat.number }}</span>{% endfor %}
+                {% for reservation in booking.reservations.all %}<span class="booking__seat">{{ reservation.seat.label }}</span>{% endfor %}
             </span>
             <span class="booking__info">
-                <span class="booking__movie">{{ booking.screening.movie.title }}</span>
+                {% with screening=booking.reservations.all.0.seat.screening %}
+                <span class="booking__movie">{{ screening.movie.title }}</span>
                 <span class="booking__meta">
-                    {{ booking.screening.start_time|date:"D j M, H:i" }}
-                    &middot; {{ booking.screening.auditorium.name }}
+                    {{ screening.start_time|date:"D j M, H:i" }}
+                    &middot; {{ screening.auditorium.name }}
+                    &middot; &yen;{{ booking.total|intcomma }}
                 </span>
+                {% endwith %}
             </span>
             <span class="booking__status booking__status--{{ booking.status }}">
                 {{ booking.status }}
             </span>
         </a>
         {% if booking.status == "confirmed" %}
-        {% include "cinema/_cancel_form.html" with group_id=booking.group_id %}
+        {% include "cinema/_cancel_form.html" with reference=booking.reference %}
         {% endif %}
     </li>
     {% empty %}
