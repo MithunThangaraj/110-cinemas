@@ -1,4 +1,5 @@
 {% extends "cinema/base.html" %}
+{% load humanize %}
 
 {% block title %}Booking Confirmed - 110 Cinemas{% endblock %}
 
@@ -28,11 +29,11 @@
                 </div>
                 <div>
                     <dt>Where</dt>
-                    <dd>{{ screening.venue }}</dd>
+                    <dd>{{ screening.auditorium.name }}</dd>
                 </div>
                 <div>
                     <dt>Total</dt>
-                    <dd>&euro;{{ total }}</dd>
+                    <dd>&yen;{{ total|intcomma }}</dd>
                 </div>
                 <div>
                     <dt>Booking reference</dt>

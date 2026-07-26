@@ -6,7 +6,15 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
-from .models import POSTER_THEMES, Movie, Reservation, Screening, Seat
+from .layouts import LAYOUTS
+from .models import (
+    POSTER_THEMES,
+    Auditorium,
+    Movie,
+    Reservation,
+    Screening,
+    Seat,
+)
 from .services import (
     MAX_SEATS_PER_BOOKING,
     cancel_booking,
@@ -56,30 +64,69 @@ class TestMovie:
 
 @pytest.mark.django_db
 class TestScreening:
-    def test_create_screening(self, movie):
+    def test_create_screening(self, movie, auditorium):
         start = timezone.now() + timedelta(days=1)
         screening = Screening.objects.create(
             movie=movie,
-            venue="Auditorium 1",
+            auditorium=auditorium,
             start_time=start,
-            base_price="14.50",
+            base_price=2000,
         )
         assert screening.movie == movie
         assert str(movie) in str(screening)
+        assert auditorium.name in str(screening)
 
-    def test_screening_past_start_time_raises(self, movie):
+    def test_screening_past_start_time_raises(self, movie, auditorium):
         past = timezone.now() - timedelta(days=1)
         with pytest.raises(ValidationError):
             Screening.objects.create(
                 movie=movie,
-                venue="Auditorium 1",
+                auditorium=auditorium,
                 start_time=past,
-                base_price="14.50",
+                base_price=2000,
             )
 
-    def test_screening_generates_seats(self, future_screening):
+    def test_screening_generates_seats_for_its_layout(self, future_screening):
         seats = Seat.objects.filter(screening=future_screening)
-        assert seats.count() == 96
+        # A standard screen is 10 rows x 18 seats.
+        assert seats.count() == 180
+        assert future_screening.auditorium.seat_count == 180
+
+    def test_imax_is_laid_out_larger_than_standard(
+        self, movie, auditorium, imax_auditorium
+    ):
+        start = timezone.now() + timedelta(days=1)
+        imax = Screening.objects.create(
+            movie=movie, auditorium=imax_auditorium, start_time=start, base_price=2000
+        )
+        assert imax.seats.count() == 468
+        assert imax.seats.count() > auditorium.seat_count
+
+    def test_pricing_adds_format_and_seat_surcharges(self, movie, imax_auditorium):
+        start = timezone.now() + timedelta(days=1)
+        imax = Screening.objects.create(
+            movie=movie, auditorium=imax_auditorium, start_time=start, base_price=2000
+        )
+        # 2000 base + 1000 IMAX surcharge, and premium seats add 500 more.
+        assert imax.cheapest_price == 3000
+        assert imax.premium_price == 3500
+
+    def test_wheelchair_spaces_never_cost_the_premium_rate(self, future_screening):
+        layout = future_screening.auditorium.layout
+        space = future_screening.seats.get(
+            row=layout.wheelchair_row, number=layout.wheelchair_seats[0]
+        )
+        assert space.kind == Seat.Kind.WHEELCHAIR
+        assert space.price == future_screening.cheapest_price
+
+    def test_every_layout_has_wheelchair_spaces(self, movie, auditorium):
+        for screen_format in Auditorium.Format.values:
+            layout = LAYOUTS[screen_format]
+            kinds = {
+                layout.kind_for(layout.wheelchair_row, number)
+                for number in layout.wheelchair_seats
+            }
+            assert kinds == {"wheelchair"}, screen_format
 
 
 @pytest.mark.django_db

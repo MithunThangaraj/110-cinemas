@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Movie, Reservation, Screening, Seat
+from .models import Auditorium, Movie, Reservation, Screening, Seat
 
 
 @admin.register(Movie)
@@ -14,17 +14,23 @@ class MovieAdmin(admin.ModelAdmin):
         return bool(movie.poster_image)
 
 
+@admin.register(Auditorium)
+class AuditoriumAdmin(admin.ModelAdmin):
+    list_display = ["name", "screen_format", "surcharge", "seat_count"]
+    list_filter = ["screen_format"]
+
+
 @admin.register(Screening)
 class ScreeningAdmin(admin.ModelAdmin):
-    list_display = ["movie", "venue", "start_time", "base_price"]
-    list_filter = ["venue", "start_time"]
+    list_display = ["movie", "auditorium", "start_time", "base_price"]
+    list_filter = ["auditorium", "start_time"]
     search_fields = ["movie__title"]
 
 
 @admin.register(Seat)
 class SeatAdmin(admin.ModelAdmin):
-    list_display = ["screening", "row", "number", "is_available"]
-    list_filter = ["screening"]
+    list_display = ["screening", "row", "number", "kind", "is_available"]
+    list_filter = ["kind", "screening"]
 
 
 @admin.register(Reservation)

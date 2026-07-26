@@ -1,12 +1,46 @@
+import hashlib
 import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 
 from .models import Reservation, Seat
 
 # How many seats one visitor may reserve in a single booking.
 MAX_SEATS_PER_BOOKING = 6
+
+
+def seats_with_availability(screening):
+    """Every seat in a screening, annotated with whether it is taken.
+
+    `Seat.is_available` costs one query per seat. An IMAX GT house has 468 of
+    them, so rendering the map that way would be 468 queries; this is one.
+    """
+    taken = Reservation.objects.filter(
+        seat=OuterRef("pk"), status=Reservation.Status.CONFIRMED
+    )
+    # select_related so each seat can price itself without another query.
+    return screening.seats.select_related(
+        "screening", "screening__auditorium"
+    ).annotate(taken=Exists(taken))
+
+
+def availability_signature(screening):
+    """A short digest of which seats are taken.
+
+    Lets the seat map poll cheaply: if the digest has not moved, nothing has
+    been booked and the client is told to keep what it has.
+    """
+    taken = (
+        Reservation.objects.filter(
+            seat__screening=screening, status=Reservation.Status.CONFIRMED
+        )
+        .order_by("seat_id")
+        .values_list("seat_id", flat=True)
+    )
+    joined = ",".join(str(seat_id) for seat_id in taken)
+    return hashlib.sha256(joined.encode()).hexdigest()[:16]
 
 
 @transaction.atomic
@@ -38,7 +72,10 @@ def create_booking(seat_ids, customer_name="", customer_email=""):
     if len(seats) != len(seat_ids):
         raise ValidationError("Some of those seats no longer exist.")
 
-    if any(not seat.is_available for seat in seats):
+    # One query for the whole selection rather than one per seat.
+    if Reservation.objects.filter(
+        seat_id__in=seat_ids, status=Reservation.Status.CONFIRMED
+    ).exists():
         raise ValidationError("Some of those seats have already been reserved.")
 
     group_id = uuid.uuid4()

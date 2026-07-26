@@ -32,6 +32,40 @@ uv run python manage.py seed_demo_data
 uv run python manage.py fetch_posters
 ```
 
+## Auditoriums, seat maps and prices
+
+A screening runs in an **`Auditorium`**, whose format decides both its seat map
+and its price. The layouts live in `cinema/layouts.py`:
+
+| Format | Layout | Seats | Surcharge |
+| --- | --- | --- | --- |
+| IMAX GT | 18 rows x 26 | 468 | +¥1,000 |
+| Dolby Cinema | 13 rows x 22 | 286 | +¥1,000 |
+| 4DX | 8 rows x 14 | 112 | +¥1,200 |
+| Standard | 10 rows x 18 | 180 | — |
+
+Prices are in yen, which has no minor unit, so `base_price` is a whole number.
+One seat costs `screening.base_price + auditorium.surcharge + seat surcharge`,
+where a premium (centre block) seat adds ¥500. So a premium seat at an IMAX GT
+screening is ¥2,000 + ¥1,000 + ¥500 = **¥3,500**.
+
+Every layout includes **wheelchair spaces**, marked on the map. They are never
+sold at the premium rate, even when they sit inside the premium block.
+
+## Live seat availability
+
+The seat map polls `GET /screenings/<id>/availability/` every 8 seconds so it
+stays current while a visitor is choosing.
+
+Two things make it unobtrusive:
+
+- The page sends the availability digest it last rendered. If nothing has been
+  booked since, the view answers **204 No Content** and HTMX leaves the DOM
+  alone — no flicker, and no focus taken from someone mid-selection.
+- The poll sends the visitor's current selection (`hx-include`), so a refresh
+  keeps their seats. If one of them was taken in the meantime, it is dropped
+  and the page says which.
+
 ## Booking
 
 A visitor picks up to **6 seats** on the seat map and reserves them in one step

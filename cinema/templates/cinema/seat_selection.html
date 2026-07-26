@@ -1,4 +1,5 @@
 {% extends "cinema/base.html" %}
+{% load humanize %}
 
 {% block title %}Select a Seat - 110 Cinemas{% endblock %}
 
@@ -12,9 +13,9 @@
     <div>
         <h2 class="screening-header__title">{{ screening.movie.title }}</h2>
         <p class="screening-header__meta">
-            <span class="chip">{{ screening.venue }}</span>
+            <span class="chip chip--format">{{ screening.auditorium.name }}</span>
             <span class="chip">{{ screening.start_time|date:"D j M, H:i" }}</span>
-            <span class="chip chip--price">&euro;{{ screening.base_price }}</span>
+            <span class="chip chip--price">from &yen;{{ screening.cheapest_price|intcomma }}</span>
         </p>
     </div>
 </section>
