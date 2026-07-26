@@ -14,7 +14,26 @@ data (the deployed database is rebuilt on every deploy anyway).
 import django.db.models.deletion
 from django.db import migrations, models
 
-from cinema.layouts import LAYOUTS
+# Frozen copy of the layouts as they were when this migration was written.
+# Migrations must not import live app code: `cinema.layouts` has since grown
+# tapered rows, and a migration that changed shape with it would no longer
+# describe what it actually did to a database it already ran against.
+# (rows, seats per row, premium rows, wheelchair row, wheelchair seats)
+LAYOUTS_AT_THIS_MIGRATION = {
+    "imax_gt": (18, 26, ("H", "I", "J", "K", "L", "M"), "K", (1, 2, 25, 26)),
+    "dolby": (13, 22, ("F", "G", "H", "I"), "H", (1, 2, 21, 22)),
+    "4dx": (8, 14, ("D", "E"), "H", (1, 2, 13, 14)),
+    "standard": (10, 18, ("E", "F", "G"), "J", (1, 2, 17, 18)),
+}
+
+
+def kind_for(number, row, premium_rows, wheelchair_row, wheelchair_seats):
+    if row == wheelchair_row and number in wheelchair_seats:
+        return "wheelchair"
+    if row in premium_rows:
+        return "premium"
+    return "standard"
+
 
 # (name, format, surcharge in yen). Surcharges follow Japanese multiplex
 # pricing: premium formats cost more, 4DX most of all.
@@ -68,17 +87,25 @@ def build_auditoriums_and_relay_out_screens(apps, schema_editor):
 
         # Lay the room out again to match its new format.
         Seat.objects.filter(screening=screening).delete()
-        layout = LAYOUTS[auditorium.screen_format]
+        rows, per_row, premium, chair_row, chair_seats = LAYOUTS_AT_THIS_MIGRATION[
+            auditorium.screen_format
+        ]
         Seat.objects.bulk_create(
             [
                 Seat(
                     screening=screening,
-                    row=row,
+                    row=chr(ord("A") + index),
                     number=number,
-                    kind=layout.kind_for(row, number),
+                    kind=kind_for(
+                        number,
+                        chr(ord("A") + index),
+                        premium,
+                        chair_row,
+                        chair_seats,
+                    ),
                 )
-                for row in layout.row_labels()
-                for number in range(1, layout.seats_per_row + 1)
+                for index in range(rows)
+                for number in range(1, per_row + 1)
             ]
         )
 

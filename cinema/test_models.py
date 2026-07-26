@@ -88,9 +88,9 @@ class TestScreening:
 
     def test_screening_generates_seats_for_its_layout(self, future_screening):
         seats = Seat.objects.filter(screening=future_screening)
-        # A standard screen is 10 rows x 18 seats.
-        assert seats.count() == 180
-        assert future_screening.auditorium.seat_count == 180
+        # A standard screen is 10 rows tapering from 15 seats to 18.
+        assert seats.count() == 174
+        assert future_screening.auditorium.seat_count == 174
 
     def test_imax_is_laid_out_larger_than_standard(
         self, movie, auditorium, imax_auditorium
@@ -99,7 +99,7 @@ class TestScreening:
         imax = Screening.objects.create(
             movie=movie, auditorium=imax_auditorium, start_time=start, base_price=2000
         )
-        assert imax.seats.count() == 468
+        assert imax.seats.count() == 432
         assert imax.seats.count() > auditorium.seat_count
 
     def test_pricing_adds_format_and_seat_surcharges(self, movie, imax_auditorium):
@@ -113,18 +113,42 @@ class TestScreening:
 
     def test_wheelchair_spaces_never_cost_the_premium_rate(self, future_screening):
         layout = future_screening.auditorium.layout
-        space = future_screening.seats.get(
-            row=layout.wheelchair_row, number=layout.wheelchair_seats[0]
-        )
+        space = future_screening.seats.get(row=layout.wheelchair_row, number=1)
         assert space.kind == Seat.Kind.WHEELCHAIR
         assert space.price == future_screening.cheapest_price
+
+    def test_rows_taper_toward_the_screen(self, future_screening):
+        """Rows nearest the screen hold fewer seats than the back rows."""
+        counts = [
+            future_screening.seats.filter(row=label).count()
+            for label in future_screening.auditorium.layout.row_labels()
+        ]
+        assert counts[0] < counts[-1]
+        # Never widening as you walk toward the screen.
+        assert counts == sorted(counts)
+
+    def test_every_layout_tapers(self):
+        for screen_format, layout in LAYOUTS.items():
+            counts = [layout.seats_in_row(i) for i in range(layout.rows)]
+            assert counts[0] < counts[-1], screen_format
+            assert counts == sorted(counts), screen_format
+
+    def test_aisles_are_measured_from_both_ends_of_a_row(self):
+        layout = LAYOUTS["standard"]
+        # A short front row and a full back row both get two aisles, each the
+        # same distance in from its end.
+        for width in (layout.seats_in_row(0), layout.back_row_seats):
+            aisles = [n for n in range(1, width + 1) if layout.is_aisle(n, width)]
+            assert aisles == [layout.aisle_from_ends, width - layout.aisle_from_ends]
 
     def test_every_layout_has_wheelchair_spaces(self, movie, auditorium):
         for screen_format in Auditorium.Format.values:
             layout = LAYOUTS[screen_format]
+            index = layout.row_labels().index(layout.wheelchair_row)
+            width = layout.seats_in_row(index)
+            ends = [1, 2, width - 1, width]
             kinds = {
-                layout.kind_for(layout.wheelchair_row, number)
-                for number in layout.wheelchair_seats
+                layout.kind_for(layout.wheelchair_row, number, width) for number in ends
             }
             assert kinds == {"wheelchair"}, screen_format
 

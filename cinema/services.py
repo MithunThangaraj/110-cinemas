@@ -11,6 +11,20 @@ from .models import Reservation, Seat
 MAX_SEATS_PER_BOOKING = 6
 
 
+def validate_selection(seat_ids):
+    """Check how many seats were chosen, before anything is booked.
+
+    Shared so the view can reject a bad selection up front rather than walking
+    the visitor through the details step only to fail at the end.
+    """
+    if not seat_ids:
+        raise ValidationError("Choose at least one seat.")
+    if len(seat_ids) > MAX_SEATS_PER_BOOKING:
+        raise ValidationError(
+            f"You can book at most {MAX_SEATS_PER_BOOKING} seats at a time."
+        )
+
+
 def seats_with_availability(screening):
     """Every seat in a screening, annotated with whether it is taken.
 
@@ -24,6 +38,26 @@ def seats_with_availability(screening):
     return screening.seats.select_related(
         "screening", "screening__auditorium"
     ).annotate(taken=Exists(taken))
+
+
+def seat_rows(screening):
+    """The screening's seats grouped into rows, ready to render.
+
+    Rows differ in length once a layout tapers, so whether an aisle falls after
+    a seat depends on how long its row is. Working that out here keeps the
+    arithmetic out of the template.
+    """
+    layout = screening.auditorium.layout
+    rows = {}
+    for seat in seats_with_availability(screening):
+        rows.setdefault(seat.row, []).append(seat)
+
+    grouped = []
+    for label, row_seats in rows.items():
+        for seat in row_seats:
+            seat.is_aisle = layout.is_aisle(seat.number, len(row_seats))
+        grouped.append({"label": label, "seats": row_seats})
+    return grouped
 
 
 def availability_signature(screening):
@@ -51,13 +85,7 @@ def create_booking(seat_ids, customer_name="", customer_email=""):
     """
     # dict.fromkeys de-duplicates while keeping the submitted order.
     seat_ids = list(dict.fromkeys(seat_ids))
-
-    if not seat_ids:
-        raise ValidationError("Choose at least one seat.")
-    if len(seat_ids) > MAX_SEATS_PER_BOOKING:
-        raise ValidationError(
-            f"You can book at most {MAX_SEATS_PER_BOOKING} seats at a time."
-        )
+    validate_selection(seat_ids)
 
     # Lock every seat before checking availability, so two visitors booking at
     # the same time cannot both see the same seat as free. Ordering by primary

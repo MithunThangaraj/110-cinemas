@@ -14,6 +14,19 @@ from .services import (
     reserve_seat,
 )
 
+DETAILS = {
+    "step": "details",
+    "customer_name": "Ada Lovelace",
+    "customer_email": "ada@example.com",
+}
+
+
+def booking_payload(seats, **overrides):
+    """Everything the final step of the booking flow submits."""
+    payload = {"seats": [seat.id for seat in seats], **DETAILS}
+    payload.update(overrides)
+    return payload
+
 
 @pytest.mark.django_db
 class TestIndex:
@@ -141,18 +154,123 @@ class TestSeatMapQueryCount:
     def test_seat_map_does_not_scale_queries_with_seat_count(
         self, client, django_assert_max_num_queries, movie, imax_auditorium
     ):
-        """Seat.is_available would be one query per seat - 468 of them here."""
+        """Seat.is_available would be one query per seat - 432 of them here."""
         screening = Screening.objects.create(
             movie=movie,
             auditorium=imax_auditorium,
             start_time=timezone.now() + timedelta(days=2),
             base_price=2000,
         )
-        assert screening.seats.count() == 468
+        assert screening.seats.count() == 432
 
         with django_assert_max_num_queries(12):
             response = client.get(reverse("seat-selection", args=[screening.id]))
         assert response.status_code == 200
+
+
+@pytest.mark.django_db
+class TestBookingDetailsStep:
+    """Choosing seats leads to a details step; only that step books."""
+
+    def _url(self, screening):
+        return reverse("reserve-seats", args=[screening.id])
+
+    def test_choosing_seats_asks_for_details_and_books_nothing(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:2])
+        response = client.post(
+            self._url(future_screening), {"seats": [seat.id for seat in seats]}
+        )
+        assert response.status_code == 200
+        assert b"customer_name" in response.content
+        assert b"customer_email" in response.content
+        # Nothing is booked until the details step is submitted.
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_details_step_shows_the_chosen_seats_and_total(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:3])
+        response = client.post(
+            self._url(future_screening), {"seats": [seat.id for seat in seats]}
+        )
+        body = response.content.decode()
+        for seat in seats:
+            assert seat.label in body
+        assert "6,000" in body
+
+    def test_submitting_details_books_and_records_who_for(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:2])
+        response = client.post(self._url(future_screening), booking_payload(seats))
+        assert response.status_code == 302
+        reservation = seats[0].reservations.get(status="confirmed")
+        assert reservation.customer_name == "Ada Lovelace"
+        assert reservation.customer_email == "ada@example.com"
+
+    def test_invalid_details_re_render_the_step_without_booking(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:2])
+        response = client.post(
+            self._url(future_screening),
+            booking_payload(seats, customer_email="not-an-email"),
+        )
+        assert response.status_code == 200
+        assert b"customer_email" in response.content
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_missing_name_re_renders_the_step_without_booking(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:2])
+        response = client.post(
+            self._url(future_screening), booking_payload(seats, customer_name="")
+        )
+        assert response.status_code == 200
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_going_back_returns_to_the_map_with_the_selection_intact(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:3])
+        response = client.post(
+            self._url(future_screening),
+            {"seats": [seat.id for seat in seats], "step": "seats"},
+        )
+        assert response.status_code == 200
+        assert b'type="checkbox"' in response.content
+        body = response.content.decode()
+        for seat in seats:
+            assert f'value="{seat.id}"' in body
+        assert all(seat.is_available is True for seat in seats)
+
+    def test_a_seat_taken_while_typing_sends_them_back_to_the_map(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:2])
+        # Seats are not held during the details step.
+        create_booking([seats[0].id])
+
+        response = client.post(self._url(future_screening), booking_payload(seats))
+
+        assert response.status_code == 200
+        assert b"already been reserved" in response.content
+        assert b'type="checkbox"' in response.content
+        assert seats[1].is_available is True
+
+    def test_htmx_details_step_is_a_partial(self, client, future_screening):
+        seats = list(future_screening.seats.all()[:2])
+        response = client.post(
+            self._url(future_screening),
+            {"seats": [seat.id for seat in seats]},
+            HTTP_HX_REQUEST="true",
+        )
+        assert response.status_code == 200
+        assert b"<html" not in response.content
+        assert b"customer_name" in response.content
 
 
 @pytest.mark.django_db
@@ -162,7 +280,7 @@ class TestReserveSeats:
 
     def test_reserve_one_seat_redirects_to_confirmation(self, client, future_screening):
         seat = future_screening.seats.first()
-        response = client.post(self._url(future_screening), {"seats": [seat.id]})
+        response = client.post(self._url(future_screening), booking_payload([seat]))
         seat.refresh_from_db()
         assert response.status_code == 302
         assert seat.is_available is False
@@ -173,30 +291,26 @@ class TestReserveSeats:
 
     def test_reserve_several_seats_creates_one_booking(self, client, future_screening):
         seats = list(future_screening.seats.all()[:4])
-        response = client.post(
-            self._url(future_screening), {"seats": [seat.id for seat in seats]}
-        )
+        response = client.post(self._url(future_screening), booking_payload(seats))
         assert response.status_code == 302
         reservations = [seat.reservations.get(status="confirmed") for seat in seats]
         assert len({r.group_id for r in reservations}) == 1
 
     def test_reserve_at_the_limit_is_allowed(self, client, future_screening):
         seats = list(future_screening.seats.all()[:MAX_SEATS_PER_BOOKING])
-        client.post(self._url(future_screening), {"seats": [seat.id for seat in seats]})
+        client.post(self._url(future_screening), booking_payload(seats))
         assert all(seat.is_available is False for seat in seats)
 
     def test_reserve_over_the_limit_books_nothing(self, client, future_screening):
         seats = list(future_screening.seats.all()[: MAX_SEATS_PER_BOOKING + 1])
-        response = client.post(
-            self._url(future_screening), {"seats": [seat.id for seat in seats]}
-        )
+        response = client.post(self._url(future_screening), booking_payload(seats))
         assert response.status_code == 200
         assert b"at most" in response.content
         assert all(seat.is_available is True for seat in seats)
 
     def test_reserve_remembers_booking_in_session(self, client, future_screening):
         seat = future_screening.seats.first()
-        client.post(self._url(future_screening), {"seats": [seat.id]})
+        client.post(self._url(future_screening), booking_payload([seat]))
         reservation = seat.reservations.get(status="confirmed")
         assert str(reservation.group_id) in client.session["booking_group_ids"]
 
@@ -217,7 +331,7 @@ class TestReserveSeats:
         )
         foreign_seat = other.seats.first()
         response = client.post(
-            self._url(future_screening), {"seats": [foreign_seat.id]}
+            self._url(future_screening), booking_payload([foreign_seat])
         )
         assert response.status_code == 200
         assert b"choose a seat" in response.content
@@ -226,9 +340,7 @@ class TestReserveSeats:
     def test_reserve_already_taken_seat_books_nothing(self, client, future_screening):
         seats = list(future_screening.seats.all()[:3])
         reserve_seat(seats[-1].id)
-        response = client.post(
-            self._url(future_screening), {"seats": [seat.id for seat in seats]}
-        )
+        response = client.post(self._url(future_screening), booking_payload(seats))
         assert response.status_code == 200
         assert b"already been reserved" in response.content
         # The seats that were free must stay free: a booking is all or nothing.
@@ -245,7 +357,7 @@ class TestReserveSeatsHtmx:
         seats = list(future_screening.seats.all()[:2])
         response = client.post(
             self._url(future_screening),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
@@ -265,7 +377,7 @@ class TestReserveSeatsHtmx:
         seats = list(future_screening.seats.all()[: MAX_SEATS_PER_BOOKING + 1])
         response = client.post(
             self._url(future_screening),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
@@ -277,7 +389,7 @@ class TestReserveSeatsHtmx:
         reserve_seat(seat.id)
         response = client.post(
             self._url(future_screening),
-            {"seats": [seat.id]},
+            booking_payload([seat]),
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
@@ -293,7 +405,7 @@ class TestBookingConfirmation:
         seats = list(future_screening.seats.all()[:3])
         client.post(
             reverse("reserve-seats", args=[future_screening.id]),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
         )
         group_id = seats[0].reservations.get(status="confirmed").group_id
 
@@ -303,6 +415,19 @@ class TestBookingConfirmation:
             assert f"{seat.row}{seat.number}".encode() in response.content
         # Three standard seats at the base price of 2,000 yen.
         assert b"6,000" in response.content
+
+    def test_confirmation_shows_who_booked_it(self, client, future_screening):
+        seats = list(future_screening.seats.all()[:2])
+        client.post(
+            reverse("reserve-seats", args=[future_screening.id]),
+            booking_payload(seats),
+        )
+        group_id = seats[0].reservations.get(status="confirmed").group_id
+
+        response = client.get(reverse("booking-confirmation", args=[group_id]))
+
+        assert b"Ada Lovelace" in response.content
+        assert b"ada@example.com" in response.content
 
     def test_unknown_booking_404s(self, client):
         response = client.get(
@@ -320,7 +445,7 @@ class TestCancelBooking:
         seats = list(screening.seats.all()[:count])
         client.post(
             reverse("reserve-seats", args=[screening.id]),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
         )
         return seats, seats[0].reservations.get(status="confirmed").group_id
 
@@ -337,7 +462,7 @@ class TestCancelBooking:
 
         client.post(
             reverse("reserve-seats", args=[future_screening.id]),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
         )
         assert all(seat.is_available is False for seat in seats)
 
@@ -454,7 +579,7 @@ class TestMyBookings:
         seats = list(future_screening.seats.all()[:2])
         client.post(
             reverse("reserve-seats", args=[future_screening.id]),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
         )
         response = client.get(reverse("my-bookings"))
         assert response.status_code == 200
@@ -467,7 +592,7 @@ class TestMyBookings:
         seats = list(future_screening.seats.all()[:3])
         client.post(
             reverse("reserve-seats", args=[future_screening.id]),
-            {"seats": [seat.id for seat in seats]},
+            booking_payload(seats),
         )
         response = client.get(reverse("my-bookings"))
         assert response.content.count(b'class="booking"') == 1

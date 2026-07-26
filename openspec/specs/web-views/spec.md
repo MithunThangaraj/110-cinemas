@@ -33,8 +33,7 @@ The system SHALL expose `GET /screenings/<screening_id>/seats/`
 (name: `seat-selection`) taking a `screening_id` (integer, path parameter) and
 returning an HTML page that shows every seat for that screening as a seat map,
 where each available seat is a checkbox and reserved seats are shown as
-unavailable. Up to 6 seats may be chosen and reserved as one booking; no
-customer details are collected.
+unavailable. Up to 6 seats may be chosen and reserved as one booking.
 
 The map is generated from the screening's auditorium, so its size and shape
 follow the screen format (an IMAX GT house is far larger than a 4DX room).
@@ -57,10 +56,24 @@ kind's price is shown, in yen.
 ### Requirement: Reserve seats action
 The system SHALL expose `POST /screenings/<screening_id>/reserve/`
 (name: `reserve-seats`) taking a `screening_id` (integer, path parameter). The
-chosen seats are submitted as repeated `seats` form fields. No customer details
-are collected. The view SHALL ignore any submitted seat that does not belong to
-the screening, and SHALL reject a submission of no seats or of more than the
-per-booking maximum (6).
+chosen seats are submitted as repeated `seats` form fields. The view SHALL
+ignore any submitted seat that does not belong to the screening, and SHALL
+reject a submission of no seats, of more than the per-booking maximum (6), or
+including a seat that is already taken.
+
+Booking happens in two steps, distinguished by a `step` field:
+
+- **No `step`** — the seats are accepted and the response asks who the booking
+  is for (a name and email). Nothing is reserved yet.
+- **`step=details`** — the submitted name and email are validated and the
+  booking is created. Invalid details SHALL re-render the details step without
+  reserving anything.
+- **`step=seats`** — "back": the response is the seat map again with the
+  submitted seats still selected, and nothing reserved.
+
+Seats are NOT held between the two steps. If a seat is taken while the visitor
+is entering their details, the booking SHALL fail and the response SHALL be the
+seat map with an error, not a dead form.
 
 Seats reserved together form one booking: the reservations created SHALL share
 a `group_id`, and the booking SHALL be all-or-nothing — if any chosen seat is

@@ -116,10 +116,10 @@ def generate_seats(screening):
             screening=screening,
             row=row,
             number=number,
-            kind=layout.kind_for(row, number),
+            kind=layout.kind_for(row, number, count),
         )
-        for row in layout.row_labels()
-        for number in range(1, layout.seats_per_row + 1)
+        for row, count in layout.rows_with_seats()
+        for number in range(1, count + 1)
     ]
     Seat.objects.bulk_create(seats)
 
