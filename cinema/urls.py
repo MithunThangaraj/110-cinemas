@@ -25,6 +25,7 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("movies/", views.movie_list, name="movie-list"),
     path("my-bookings/", views.my_bookings, name="my-bookings"),
+    path("menu/", views.menu, name="menu"),
     path(
         "screenings/<int:screening_id>/seats/",
         views.seat_selection,

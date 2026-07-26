@@ -31,9 +31,31 @@
                     <dt>Where</dt>
                     <dd>{{ screening.auditorium.name }}</dd>
                 </div>
+                {% if extras %}
+                <div>
+                    <dt>Food &amp; drink</dt>
+                    <dd>
+                        <ul class="ticket__extras">
+                            {% for line in extras %}
+                            <li>
+                                {{ line.quantity }} &times; {{ line.item.name }}
+                                <span>&yen;{{ line.line_total|intcomma }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+                {% endif %}
                 <div>
                     <dt>Total</dt>
-                    <dd>&yen;{{ total|intcomma }}</dd>
+                    <dd>
+                        &yen;{{ grand_total|intcomma }}
+                        {% if extras %}
+                        <span class="ticket__breakdown">
+                            seats &yen;{{ total|intcomma }} + food &yen;{{ extras_total|intcomma }}
+                        </span>
+                        {% endif %}
+                    </dd>
                 </div>
                 {% if booked_by %}
                 <div>

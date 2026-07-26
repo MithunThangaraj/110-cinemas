@@ -167,6 +167,60 @@ class Seat(models.Model):
         ).exists()
 
 
+class MenuItem(models.Model):
+    """Something sold at the concession stand."""
+
+    class Category(models.TextChoices):
+        POPCORN = "popcorn", "Popcorn"
+        SNACKS = "snacks", "Snacks"
+        DRINKS = "drinks", "Drinks"
+        DESSERTS = "desserts", "Desserts"
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    category = models.CharField(
+        max_length=20, choices=Category.choices, default=Category.SNACKS
+    )
+    # Yen, like ticket prices.
+    price = models.PositiveIntegerField()
+    image_url = models.URLField(blank=True)
+    # Where the picture came from, so a licence that asks for credit gets it.
+    image_credit = models.CharField(max_length=255, blank=True)
+    # Wikimedia Commons file title, used to look the image up again.
+    image_source = models.CharField(max_length=255, blank=True)
+    is_available = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["category", "sort_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class BookingItem(models.Model):
+    """A menu item added to a booking."""
+
+    group_id = models.UUIDField(db_index=True)
+    item = models.ForeignKey(
+        MenuItem, on_delete=models.PROTECT, related_name="booking_items"
+    )
+    quantity = models.PositiveSmallIntegerField()
+    # Snapshot of what it cost at the time. Menu prices change; a booking that
+    # has already been paid for does not.
+    unit_price = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["item__category", "item__name"]
+
+    def __str__(self):
+        return f"{self.quantity} x {self.item.name}"
+
+    @property
+    def line_total(self):
+        return self.unit_price * self.quantity
+
+
 class Reservation(models.Model):
     class Status(models.TextChoices):
         CONFIRMED = "confirmed", "Confirmed"

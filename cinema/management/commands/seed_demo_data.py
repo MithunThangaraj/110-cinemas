@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from cinema.models import Auditorium, Movie, Screening
+from cinema.models import Auditorium, MenuItem, Movie, Screening
 
 # (title, description, release_date, runtime_minutes)
 #
@@ -125,12 +125,112 @@ def create_screenings(movie, schedule, now, auditoriums):
         )
 
 
+# (name, description, category, price yen, Wikimedia Commons file title)
+#
+# Files are named exactly so `fetch_menu_images` can look each one up; a
+# keyword search would happily return a portrait of the man who invented
+# nachos. Everything on Commons is freely licensed, so unlike film posters
+# these can be real photographs.
+DEMO_MENU = [
+    (
+        "Salted popcorn (L)",
+        "The big tub. Freshly popped, lightly salted.",
+        MenuItem.Category.POPCORN,
+        700,
+        "File:Bowl of Popcorn (Unsplash).jpg",
+    ),
+    (
+        "Caramel popcorn (L)",
+        "Sweet, sticky and worth the napkins.",
+        MenuItem.Category.POPCORN,
+        800,
+        "File:Caramel Popcorn (32402585090).jpg",
+    ),
+    (
+        "Nachos with cheese",
+        "Warm tortilla chips under melted cheese.",
+        MenuItem.Category.SNACKS,
+        750,
+        "File:Nachos-cheese (cropped).jpg",
+    ),
+    (
+        "Hot dog",
+        "Grilled, in a soft bun, with mustard and relish.",
+        MenuItem.Category.SNACKS,
+        650,
+        "File:Hot dogs with relish and mustard.jpg",
+    ),
+    (
+        "Soft pretzel",
+        "Baked to order and salted.",
+        MenuItem.Category.SNACKS,
+        500,
+        "File:Flavored soft pretzels.jpg",
+    ),
+    (
+        "Cola (M)",
+        "Over ice. Free refills at the counter.",
+        MenuItem.Category.DRINKS,
+        450,
+        "File:Tumbler of cola with ice (cropped).jpg",
+    ),
+    (
+        "Bottled water",
+        "Still, chilled, 500ml.",
+        MenuItem.Category.DRINKS,
+        250,
+        "File:Bottle of Water.jpg",
+    ),
+    (
+        "Iced coffee",
+        "Cold brew over ice.",
+        MenuItem.Category.DRINKS,
+        550,
+        "File:Iced Coffee in Glass - Sunshine Coffee - Laramie Cafe (53838344552).jpg",
+    ),
+    (
+        "Ice cream cup",
+        "Vanilla, with sprinkles and a spoon.",
+        MenuItem.Category.DESSERTS,
+        600,
+        "File:Ice cream in cup with sprinkles and spoon.jpg",
+    ),
+    (
+        "Churros",
+        "Cinnamon sugar, with a chocolate dip.",
+        MenuItem.Category.DESSERTS,
+        700,
+        "File:Churros bought from food truck at Churchill Square 2023-07-28.jpg",
+    ),
+]
+
+
+def create_menu():
+    """Stock the concession stand. Images are fetched separately."""
+    for order, (name, description, category, price, source) in enumerate(DEMO_MENU):
+        MenuItem.objects.get_or_create(
+            name=name,
+            defaults={
+                "description": description,
+                "category": category,
+                "price": price,
+                "image_source": source,
+                "sort_order": order,
+            },
+        )
+
+
 class Command(BaseCommand):
     help = "Create demo movies and screenings if the database has none."
 
     def handle(self, *args, **options):
+        # The concession menu does not depend on the film catalogue, so it is
+        # stocked even on an install that already has movies. get_or_create
+        # keeps that safe to repeat.
+        create_menu()
+
         if Movie.objects.exists():
-            self.stdout.write("Movies already exist - skipping demo data.")
+            self.stdout.write("Movies already exist - skipping demo movies.")
             return
 
         auditoriums = create_auditoriums()
@@ -149,7 +249,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Seeded {Movie.objects.count()} movies "
-                f"and {Screening.objects.count()} screenings."
+                f"Seeded {Movie.objects.count()} movies, "
+                f"{Screening.objects.count()} screenings "
+                f"and {MenuItem.objects.count()} menu items."
             )
         )

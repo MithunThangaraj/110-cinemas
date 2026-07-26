@@ -20,6 +20,7 @@ uv run python manage.py seed_demo_data
 # Fetch real posters from the (keyless) iTunes Search API. Never fail the
 # deploy over this: movies without a poster fall back to generated key-art.
 uv run python manage.py fetch_posters || true
+uv run python manage.py fetch_menu_images || true
 
 # Optionally create an admin user, but only if credentials were supplied as
 # environment variables in the render dashboard. Never hard-code these.

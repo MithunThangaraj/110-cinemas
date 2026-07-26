@@ -1347,3 +1347,217 @@ button:hover,
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   Food & drink
+   ========================================================================== */
+
+.menu-section {
+  margin-bottom: var(--space-5);
+}
+
+.menu-section__title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.menu-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr;
+}
+
+.menu-card {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, var(--surface), rgba(20, 20, 31, 0.6));
+}
+
+.menu-card__art {
+  flex: 0 0 6rem;
+}
+
+.menu-card__photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.menu-card__photo--none {
+  background: linear-gradient(150deg, var(--surface-2), var(--line));
+}
+
+.menu-card__body {
+  min-width: 0;
+}
+
+.menu-card__name {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.menu-card__description {
+  margin: 0.2rem 0 var(--space-1);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.menu-card__price {
+  margin: 0;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.menu-card__credit {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+/* --- Adding food to a booking --- */
+
+.extras {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) 0 0;
+  border: 0;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.extras__title {
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.extras__lead {
+  margin: 0.2rem 0 var(--space-2);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.extras__group {
+  margin: var(--space-2) 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.extras__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.extra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.extra__photo {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.extra__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.extra__name {
+  font-size: 0.9rem;
+}
+
+.extra__price {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.extra__qty input {
+  width: 4rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+}
+
+.details__total--extras {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line-strong);
+}
+
+.details__grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--line-strong);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.details__grand-total-value {
+  color: var(--gold);
+  font-size: 1.3rem;
+}
+
+.ticket__extras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ticket__extras li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+}
+
+.ticket__breakdown {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+@media (min-width: 40rem) {
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 64rem) {
+  .menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

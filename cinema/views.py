@@ -7,12 +7,16 @@ from django.views.decorators.http import require_POST
 from django_htmx.http import HttpResponseClientRedirect
 
 from .forms import MovieSearchForm, ReservationForm
-from .models import Movie, Reservation, Screening
+from .models import MenuItem, Movie, Reservation, Screening
 from .services import (
+    MAX_ITEM_QUANTITY,
     MAX_SEATS_PER_BOOKING,
     availability_signature,
+    booking_extras,
     cancel_booking,
     create_booking,
+    menu_by_category,
+    parse_item_quantities,
     seat_rows,
     seats_with_availability,
     validate_selection,
@@ -40,6 +44,10 @@ def movie_list(request):
     if form.is_valid() and form.cleaned_data["q"]:
         movies = movies.filter(title__icontains=form.cleaned_data["q"])
     return render(request, "cinema/movie_list.html", {"movies": movies, "form": form})
+
+
+def menu(request):
+    return render(request, "cinema/menu.html", {"menu": menu_by_category()})
 
 
 def _reservation_context(screening, selected_seats=(), seat_error=None):
@@ -115,12 +123,24 @@ def _render_reservation_area(request, context):
     return render(request, template, context)
 
 
-def _render_details_step(request, screening, seats, form):
-    """The step that asks who the booking is for."""
+def _render_details_step(request, screening, seats, form, chosen_items=()):
+    """The step that asks who the booking is for, and offers the menu."""
+    quantities = {item.id: quantity for item, quantity in chosen_items}
+    menu = menu_by_category()
+    for group in menu:
+        for item in group["items"]:
+            item.chosen_quantity = quantities.get(item.id, 0)
+
+    seats_total = sum(seat.price for seat in seats)
+    extras_total = sum(item.price * quantity for item, quantity in chosen_items)
     context = {
         "screening": screening,
         "selected_seats": seats,
-        "selected_total": sum(seat.price for seat in seats),
+        "selected_total": seats_total,
+        "extras_total": extras_total,
+        "grand_total": seats_total + extras_total,
+        "menu": menu,
+        "max_item_quantity": MAX_ITEM_QUANTITY,
         "form": form,
     }
     template = (
@@ -177,19 +197,25 @@ def reserve_seats(request, screening_id):
             request, _reservation_context(screening, selected_seats=seats)
         )
 
+    available_items = list(MenuItem.objects.filter(is_available=True))
+    chosen_items = parse_item_quantities(request.POST, available_items)
+
     if step != "details":
-        # Seats chosen; ask who they are for.
-        return _render_details_step(request, screening, seats, ReservationForm())
+        # Seats chosen; ask who they are for and offer the menu.
+        return _render_details_step(
+            request, screening, seats, ReservationForm(), chosen_items
+        )
 
     form = ReservationForm(request.POST)
     if not form.is_valid():
-        return _render_details_step(request, screening, seats, form)
+        return _render_details_step(request, screening, seats, form, chosen_items)
 
     try:
         reservations = create_booking(
             [seat.id for seat in seats],
             customer_name=form.cleaned_data["customer_name"],
             customer_email=form.cleaned_data["customer_email"],
+            items=chosen_items,
         )
     except ValidationError as error:
         # Seats are not held while the visitor types, so one may have gone.
@@ -254,6 +280,8 @@ def booking_confirmation(request, group_id):
 
     screening = reservations[0].seat.screening
     status = _booking_status(reservations)
+    extras, extras_total = booking_extras(group_id)
+    seats_total = sum(reservation.seat.price for reservation in reservations)
     return render(
         request,
         "cinema/booking_confirmation.html",
@@ -262,7 +290,10 @@ def booking_confirmation(request, group_id):
             "reservations": reservations,
             "screening": screening,
             "seats": [reservation.seat for reservation in reservations],
-            "total": sum(reservation.seat.price for reservation in reservations),
+            "total": seats_total,
+            "extras": extras,
+            "extras_total": extras_total,
+            "grand_total": seats_total + extras_total,
             "booked_by": reservations[0].customer_name,
             "booked_email": reservations[0].customer_email,
             "status": status,
