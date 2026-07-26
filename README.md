@@ -1,41 +1,84 @@
 # 110 Cinemas
 
-A simple web application for browsing movies and reserving cinema seats.
+Browse what's on, pick your seats on a real seat map, and book them. No account
+needed.
 
-## Tech stack
-- **Backend**: Python / Django + HTMX
-- **Database**: SQLite
-- **App server (production)**: waitress
-- **Static files (production)**: WhiteNoise
+Django + HTMX, SQLite, no build step.
 
-## Setup
+## Try it live
+
+**https://one10-cinemas.onrender.com**
+
+It's on render's free tier, so the first request after a quiet spell takes
+around 50 seconds to wake the server up. After that it's quick. The demo
+catalogue is reseeded on every deploy, so any bookings you make are temporary.
+
+## Run it on your machine
+
+You need [uv](https://docs.astral.sh/uv/) and Python 3.12+. Nothing else — the
+database is a file and there is no front-end build.
+
 ```bash
-uv venv
-source .venv/bin/activate
+git clone https://github.com/MithunThangaraj/110-cinemas.git
+cd 110-cinemas
 uv sync
 ```
 
-## Run (development)
+Set up the database and fill it with the demo catalogue:
+
 ```bash
 uv run python manage.py migrate
-uv run python manage.py runserver
-```
-Then open http://localhost:8000/movies/. Create some data via the admin:
-```bash
-uv run python manage.py createsuperuser
-```
-and add a Movie and a Screening at http://localhost:8000/admin/ (seats are
-generated automatically when a screening is saved). Or just seed the demo
-catalogue:
-```bash
 uv run python manage.py seed_demo_data
 uv run python manage.py fetch_posters
 ```
 
-## Auditoriums, seat maps and prices
+Start it:
+
+```bash
+uv run python manage.py runserver
+```
+
+Then open **http://localhost:8000/**.
+
+That's it. `seed_demo_data` creates nine films and five auditoriums covering
+all four screen formats; `fetch_posters` pulls the real posters (see
+[Posters](#posters) — no API key needed). Both are safe to re-run: seeding does
+nothing once movies exist.
+
+### Optional: the Django admin
+
+To add your own movies and screenings, create a login:
+
+```bash
+uv run python manage.py createsuperuser
+```
+
+then go to **http://localhost:8000/admin/**. Saving a screening generates its
+seats automatically, laid out to match the auditorium you picked.
+
+### Optional: watch the seat map update live
+
+The seat map refreshes itself while you're choosing. To see it:
+
+1. Open the same screening in two browser windows side by side.
+2. Book a seat in one.
+3. Within about 8 seconds the other greys that seat out — without losing the
+   seats you had already selected.
+
+## Working on it
+
+```bash
+uv run pytest --cov     # tests
+uv run pylint cinema    # lint
+uv run black .          # format
+```
+
+## How it works
+
+### Auditoriums, seat maps and prices
 
 A screening runs in an **`Auditorium`**, whose format decides both its seat map
-and its price. The layouts live in `cinema/layouts.py`:
+and its price. The layouts live in [`cinema/layouts.py`](cinema/layouts.py):
 
 | Format | Layout | Seats | Surcharge |
 | --- | --- | --- | --- |
@@ -52,143 +95,65 @@ screening is ¥2,000 + ¥1,000 + ¥500 = **¥3,500**.
 Every layout includes **wheelchair spaces**, marked on the map. They are never
 sold at the premium rate, even when they sit inside the premium block.
 
-## Live seat availability
+### Booking
 
-The seat map polls `GET /screenings/<id>/availability/` every 8 seconds so it
-stays current while a visitor is choosing.
-
-Two things make it unobtrusive:
-
-- The page sends the availability digest it last rendered. If nothing has been
-  booked since, the view answers **204 No Content** and HTMX leaves the DOM
-  alone — no flicker, and no focus taken from someone mid-selection.
-- The poll sends the visitor's current selection (`hx-include`), so a refresh
-  keeps their seats. If one of them was taken in the meantime, it is dropped
-  and the page says which.
-
-## Booking
-
-A visitor picks up to **6 seats** on the seat map and reserves them in one step
-— no name, email, or account. Seats booked together share a `group_id` and are
-reserved all-or-nothing: if any one of them is taken in the meantime, none are
-booked. The limit lives in `cinema/services.py` as `MAX_SEATS_PER_BOOKING` and
-is enforced on the server; the browser only mirrors it.
+A visitor picks up to **6 seats** and reserves them in one step — no name,
+email, or account. Seats booked together share a `group_id` and are reserved
+all-or-nothing: if any one of them is taken in the meantime, none are booked.
+The limit lives in [`cinema/services.py`](cinema/services.py) as
+`MAX_SEATS_PER_BOOKING` and is enforced on the server; the browser only mirrors
+it.
 
 A booking can be cancelled from the ticket or from **My Bookings**, which puts
-every seat in it back on sale. Because there are no accounts, a booking belongs
-to the browser session that made it: cancelling requires the booking's group ID
-to be in that session, so a leaked booking link cannot be used to release
-someone else's seats.
+every seat back on sale. Because there are no accounts, a booking belongs to the
+browser session that made it: cancelling requires the booking's group ID to be
+in that session, so a leaked booking link cannot release someone else's seats.
 
-## Posters
+### Live seat availability
 
-Posters come from Apple's **iTunes Search API**, which is free and needs no API
-key or account — so there is nothing to configure, locally or on render:
+The seat map polls `GET /screenings/<id>/availability/` every 8 seconds. Two
+things keep that from being annoying:
+
+- The page sends the availability digest it last rendered. If nothing has been
+  booked since, the view answers **204 No Content** and HTMX leaves the page
+  alone — no flicker, and no focus taken from someone mid-selection.
+- The poll sends the current selection (`hx-include`), so a refresh keeps your
+  seats. If one was taken meanwhile, it is dropped and the page says which.
+
+### Posters
+
+Posters come from Apple's **iTunes Search API**, which is free and needs no key
+or account — so there is nothing to configure, locally or in production:
 
 ```bash
 uv run python manage.py fetch_posters          # fill in missing posters
 uv run python manage.py fetch_posters --force  # look them all up again
 ```
 
-Only an **exact** title match is accepted (see `cinema/posters.py`): the API
-readily returns loosely related films, and the wrong poster is worse than none.
-The store's film coverage is incomplete, so a movie with no match simply keeps
-its generated key-art — a coloured card whose palette is derived from the title
-(`Movie.poster_theme`) — instead of showing a broken image. You can always set
-`Movie.poster_image` by hand in the admin to override either result.
+Only an **exact** title match is accepted (see
+[`cinema/posters.py`](cinema/posters.py)): the API readily returns loosely
+related films, and the wrong poster is worse than none. Its film coverage is
+incomplete, so a movie with no match keeps its generated key-art — a coloured
+card whose palette comes from the title — instead of showing a broken image.
+Set `Movie.poster_image` in the admin to override either result.
 
-## Run Linter
-```bash
-uv run pylint cinema
+## Where things live
+
 ```
-
-## Run Tests
-```bash
-uv run pytest --cov
+cinema/
+  models.py      Movie, Auditorium, Screening, Seat, Reservation
+  layouts.py     seat layout per screen format
+  services.py    booking, cancelling, availability - the business rules
+  views.py       thin views; HTMX partials for the seat map
+  posters.py     poster lookup
+  templates/     page templates and partials
+  static/        the stylesheet
+openspec/specs/  what the app is specified to do
 ```
-
-## Configuration (environment variables)
-
-Settings are read from the environment, with development-friendly defaults so
-`runserver` works out of the box:
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DJANGO_DEBUG` | `True` | Set to `False` in production. |
-| `DJANGO_SECRET_KEY` | insecure dev key | Set a long random value in production. |
-| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated allowed hosts. |
-| `RENDER_EXTERNAL_HOSTNAME` | (set by render.com) | Auto-added to allowed hosts and CSRF trusted origins. |
 
 ## Deployment
 
-**How the pieces fit:** `waitress` runs the Django WSGI app; `WhiteNoise`
-serves the collected static files (CSS/JS) directly from the app server, so no
-separate Nginx/Apache is needed. There are **no media/upload files** to serve —
-movie posters are external URLs (`Movie.poster_image` is a `URLField`).
-
-### Local production run
-
-Run the app the way production does (no `runserver`, `DEBUG=False`):
-
-```bash
-# 1. Collect static files into staticfiles/ for WhiteNoise to serve.
-DJANGO_DEBUG=False uv run python manage.py collectstatic --no-input
-
-# 2. Apply migrations.
-uv run python manage.py migrate
-
-# 3. Serve with waitress in production mode.
-DJANGO_DEBUG=False \
-DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')" \
-DJANGO_ALLOWED_HOSTS="localhost,127.0.0.1" \
-uv run waitress-serve --host=127.0.0.1 --port=8000 cinema.wsgi:application
-```
-Open http://127.0.0.1:8000/movies/.
-
-### Deploy to render.com
-
-The repo includes `render.yaml` (service blueprint) and `build.sh` (build step).
-
-1. Push the repository to GitHub.
-2. On https://render.com, create a new **Blueprint** and point it at this repo;
-   render reads `render.yaml`.
-3. render runs `build.sh` (installs dependencies, runs `collectstatic`,
-   `migrate`, and seeds demo data) and then starts the app with waitress.
-4. `DJANGO_DEBUG=False` and a generated `DJANGO_SECRET_KEY` are set by
-   `render.yaml`; `RENDER_EXTERNAL_HOSTNAME` is provided by render and is
-   automatically trusted for hosts and CSRF, and enables HTTPS hardening.
-
-**Why the start command passes `--trusted-proxy`:** waitress defaults to
-`clear_untrusted_proxy_headers=True`, which strips render's `X-Forwarded-Proto`
-header. Django would then treat HTTPS requests as insecure and
-`SECURE_SSL_REDIRECT` would redirect `https -> https` forever. Trusting the
-proxy for that one header fixes it:
-
-```
-uv run waitress-serve --port=$PORT --trusted-proxy='*' \
-  --trusted-proxy-headers=x-forwarded-proto cinema.wsgi:application
-```
-
-### Demo data and the admin user on render
-
-Because render's free tier starts with an empty database on every deploy,
-`build.sh` runs `manage.py seed_demo_data`, which creates a few movies and
-future screenings (with their seats) only if no movies exist yet. Run it
-locally the same way:
-
-```bash
-uv run python manage.py seed_demo_data
-```
-
-To also get an admin login on the deployed site, add these as environment
-variables in the render dashboard (choose your own password; it is never stored
-in the repo). `build.sh` creates the superuser only when they are present:
-
-- `DJANGO_SUPERUSER_USERNAME`
-- `DJANGO_SUPERUSER_EMAIL`
-- `DJANGO_SUPERUSER_PASSWORD`
-
-> **Note on the database:** render's free tier has an ephemeral filesystem, so
-> the SQLite database resets on each deploy/restart. That is fine for a demo.
-> For durable data, attach a persistent disk (and point the SQLite file at it)
-> or switch `DATABASES` to a managed Postgres instance.
+The app is deployed to render.com from `main`. Setup, configuration and the
+production stack are documented separately in
+**[DEPLOYMENT.md](DEPLOYMENT.md)** — you do not need any of it to run the app
+locally.
