@@ -5,8 +5,8 @@ crawler prefetching a GET would cancel the booking.
 <form
     class="cancel-form"
     method="post"
-    action="{% url 'cancel-booking' group_id %}"
-    hx-post="{% url 'cancel-booking' group_id %}"
+    action="{% url 'cancel-booking' reference %}"
+    hx-post="{% url 'cancel-booking' reference %}"
     hx-confirm="Cancel this booking? The seats will go back on sale."
 >
     {% csrf_token %}

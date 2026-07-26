@@ -322,6 +322,7 @@ textarea:focus-visible,
 
 input[type="text"],
 input[type="email"],
+input[type="password"],
 input[type="search"] {
   width: 100%;
   padding: 0.65rem 0.85rem;
@@ -1560,4 +1561,117 @@ button:hover,
   .menu-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* ==========================================================================
+   Accounts
+   ========================================================================== */
+
+.site-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.site-account form {
+  margin: 0;
+}
+
+.site-account__name {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.site-account__link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.site-account__link:hover {
+  color: var(--text);
+}
+
+.button--small {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.auth {
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
+.auth__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+}
+
+.auth__lead {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+}
+
+.auth__form {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth__form button {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.auth__form .form-field__help {
+  line-height: 1.4;
+}
+
+.auth__form .form-field__help ul {
+  margin: 0.2rem 0 0;
+  padding-left: 1rem;
+}
+
+.auth__alt {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.details__total--discount {
+  color: var(--ok-text);
+}
+
+.details__total--discount .checkout__price {
+  color: var(--ok-text);
+}
+
+.details__member-prompt {
+  margin: var(--space-2) 0;
+  padding: 0.6rem var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ticket__member {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--ok-line);
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }

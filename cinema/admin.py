@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Auditorium,
+    Booking,
     BookingItem,
     MenuItem,
     Movie,
@@ -41,11 +42,18 @@ class SeatAdmin(admin.ModelAdmin):
     list_filter = ["kind", "screening"]
 
 
+@admin.register(Booking)
+class BookingAdmin(admin.ModelAdmin):
+    list_display = ["reference", "user", "customer_name", "discount", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["reference", "customer_name", "customer_email", "user__username"]
+
+
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ["booking_id", "group_id", "seat", "status", "created_at"]
+    list_display = ["seat", "booking", "status", "created_at"]
     list_filter = ["status"]
-    search_fields = ["customer_name", "customer_email", "booking_id", "group_id"]
+    search_fields = ["booking__reference", "booking__customer_name"]
 
 
 @admin.register(MenuItem)
@@ -62,5 +70,5 @@ class MenuItemAdmin(admin.ModelAdmin):
 
 @admin.register(BookingItem)
 class BookingItemAdmin(admin.ModelAdmin):
-    list_display = ["group_id", "item", "quantity", "unit_price", "line_total"]
-    search_fields = ["group_id", "item__name"]
+    list_display = ["booking", "item", "quantity", "unit_price", "line_total"]
+    search_fields = ["booking__reference", "item__name"]

@@ -16,6 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from cinema import views
@@ -26,6 +27,13 @@ urlpatterns = [
     path("movies/", views.movie_list, name="movie-list"),
     path("my-bookings/", views.my_bookings, name="my-bookings"),
     path("menu/", views.menu, name="menu"),
+    path("sign-up/", views.sign_up, name="sign-up"),
+    path(
+        "log-in/",
+        auth_views.LoginView.as_view(template_name="cinema/log_in.html"),
+        name="log-in",
+    ),
+    path("log-out/", auth_views.LogoutView.as_view(), name="log-out"),
     path(
         "screenings/<int:screening_id>/seats/",
         views.seat_selection,
@@ -42,12 +50,12 @@ urlpatterns = [
         name="seat-availability",
     ),
     path(
-        "bookings/<uuid:group_id>/",
+        "bookings/<uuid:reference>/",
         views.booking_confirmation,
         name="booking-confirmation",
     ),
     path(
-        "bookings/<uuid:group_id>/cancel/",
+        "bookings/<uuid:reference>/cancel/",
         views.cancel_booking_view,
         name="cancel-booking",
     ),

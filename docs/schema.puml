@@ -50,15 +50,31 @@ entity "seat" as seat #FFF4E5 {
   unique (screening_id, row, number)
 }
 
+entity "booking" as booking #F3E8FF {
+  * id : integer <<PK>>
+  --
+  reference : uuid <<unique>>
+  user_id : bigint <<FK, null>>
+  customer_name : varchar(255)
+  customer_email : varchar(254)
+  discount : integer
+  created_at : datetime
+}
+
+entity "auth_user" as authuser #EEEEEE {
+  * id : integer <<PK>>
+  --
+  username : varchar(150) <<unique>>
+  email : varchar(254)
+  password : varchar(128)
+}
+
 entity "reservation" as reservation #FDE7EA {
   * id : integer <<PK>>
   --
   * seat_id : bigint <<FK>>
-  booking_id : uuid <<unique>>
-  group_id : uuid <<indexed>>
+  * booking_id : bigint <<FK>>
   status : varchar(10)
-  customer_name : varchar(255)
-  customer_email : varchar(254)
   created_at : datetime
   --
   unique (seat_id, status)
@@ -83,7 +99,7 @@ entity "bookingitem" as bookingitem #E6F4EA {
   * id : integer <<PK>>
   --
   * item_id : bigint <<FK>>
-  group_id : uuid <<indexed>>
+  * booking_id : bigint <<FK>>
   quantity : smallint
   unit_price : integer
 }
@@ -94,15 +110,23 @@ screening ||--o{ seat : "lays out"
 seat ||--o{ reservation : "booked by"
 menuitem ||--o{ bookingitem : "ordered as"
 
-reservation }o..o{ bookingitem : "same group_id = one booking"
+authuser ||--o{ booking : "member (optional)"
+booking ||--o{ reservation : "seats"
+booking ||--o{ bookingitem : "food"
 
 note bottom of reservation
-  A booking = the rows sharing one group_id.
   The partial unique index allows many
   cancelled rows per seat, but only one
   confirmed — so a seat cannot be
   double-booked, and a cancelled seat
   can be sold again.
+end note
+
+note bottom of booking
+  user is null for a guest: booking never
+  requires an account. discount is stored,
+  not recomputed, so changing the member
+  offer cannot rewrite past bookings.
 end note
 
 note bottom of bookingitem

@@ -1,0 +1,22 @@
+{% extends "cinema/base.html" %}
+
+{% block title %}Log in - 110 Cinemas{% endblock %}
+
+{% block content %}
+<section class="auth">
+    <h2 class="auth__title">Log in</h2>
+    <p class="auth__lead">
+        Members save on every booking and keep their booking history.
+    </p>
+
+    <form class="auth__form" method="post">
+        {% include "cinema/_auth_fields.html" %}
+        <button type="submit">Log in</button>
+    </form>
+
+    <p class="auth__alt">
+        No account? <a href="{% url 'sign-up' %}">Sign up free</a>.<br>
+        Or <a href="{% url 'movie-list' %}">book as a guest</a> — no account needed.
+    </p>
+</section>
+{% endblock %}

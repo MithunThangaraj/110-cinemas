@@ -1,0 +1,24 @@
+{% extends "cinema/base.html" %}
+{% load humanize %}
+
+{% block title %}Sign up - 110 Cinemas{% endblock %}
+
+{% block content %}
+<section class="auth">
+    <h2 class="auth__title">Create a free account</h2>
+    <p class="auth__lead">
+        Membership is free and takes <strong>&yen;{{ discount|intcomma }}</strong>
+        off every booking.
+    </p>
+
+    <form class="auth__form" method="post">
+        {% include "cinema/_auth_fields.html" %}
+        <button type="submit">Create account</button>
+    </form>
+
+    <p class="auth__alt">
+        Already a member? <a href="{% url 'log-in' %}">Log in</a>.<br>
+        Or <a href="{% url 'movie-list' %}">book as a guest</a> — no account needed.
+    </p>
+</section>
+{% endblock %}
