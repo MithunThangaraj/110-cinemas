@@ -705,6 +705,30 @@ button:hover,
   margin: 0 auto;
 }
 
+/* Bigger rooms need smaller seats to stay readable: an IMAX GT row is 26 wide
+   against a 4DX row of 14. */
+.theater--imax_gt .seat {
+  flex: 0 0 1.4rem;
+  height: 1.25rem;
+  font-size: 0.5rem;
+  border-radius: 0.3rem 0.3rem 0.12rem 0.12rem;
+}
+
+.theater--imax_gt .seat-row__seats {
+  gap: 0.2rem;
+}
+
+.theater--dolby .seat {
+  flex: 0 0 1.7rem;
+  height: 1.5rem;
+  font-size: 0.55rem;
+}
+
+.theater--4dx .seat {
+  flex: 0 0 2.3rem;
+  height: 2rem;
+}
+
 .seat-hint {
   position: relative;
   z-index: 1;
@@ -734,8 +758,9 @@ button:hover,
   gap: 0.3rem;
 }
 
-.seat-row__seats > *:nth-child(3),
-.seat-row__seats > *:nth-child(9) {
+/* Aisle positions come from the auditorium's layout, so the template marks the
+   seat an aisle follows rather than the CSS guessing at column numbers. */
+.seat--aisle {
   margin-right: var(--space-2);
 }
 
@@ -764,6 +789,32 @@ button:hover,
   transform: translateY(-2px);
 }
 
+/* --- Seat kinds --- */
+
+.seat--premium {
+  border-color: rgba(255, 183, 3, 0.55);
+  background: linear-gradient(180deg, #3a3320, #241f13);
+  color: var(--gold);
+}
+
+.seat--available.seat--premium:hover {
+  border-color: var(--gold);
+}
+
+.seat--wheelchair {
+  border-color: rgba(86, 204, 242, 0.6);
+  background: linear-gradient(180deg, #1e3440, #14222b);
+  color: var(--cyan);
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.seat--available.seat--wheelchair:hover {
+  border-color: var(--cyan);
+}
+
+/* Selection and reserved states must win over the kind colours, so these come
+   after them in the cascade. */
 .seat--available:has(input:checked),
 .seat--legend-selected {
   background: linear-gradient(180deg, var(--accent-soft), var(--accent-deep));

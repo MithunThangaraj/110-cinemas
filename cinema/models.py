@@ -5,6 +5,8 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from .layouts import LAYOUTS
+
 # Number of colour schemes available for generated poster art.
 POSTER_THEMES = 6
 
@@ -34,19 +36,68 @@ class Movie(models.Model):
         return sum(ord(char) for char in self.title) % POSTER_THEMES + 1
 
 
+class Auditorium(models.Model):
+    """A physical screen. Its format decides both the seat map and the price."""
+
+    class Format(models.TextChoices):
+        STANDARD = "standard", "Standard"
+        IMAX_GT = "imax_gt", "IMAX GT"
+        DOLBY = "dolby", "Dolby Cinema"
+        FOUR_DX = "4dx", "4DX"
+
+    name = models.CharField(max_length=100, unique=True)
+    screen_format = models.CharField(
+        max_length=20, choices=Format.choices, default=Format.STANDARD
+    )
+    # Yen added to the screening's base price for every seat in this room.
+    surcharge = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def layout(self):
+        return LAYOUTS[self.screen_format]
+
+    @property
+    def seat_count(self):
+        return self.layout.seat_count
+
+
 class Screening(models.Model):
     movie = models.ForeignKey(
         Movie, on_delete=models.CASCADE, related_name="screenings"
     )
-    venue = models.CharField(max_length=255)
+    auditorium = models.ForeignKey(
+        Auditorium, on_delete=models.PROTECT, related_name="screenings"
+    )
     start_time = models.DateTimeField()
-    base_price = models.DecimalField(max_digits=6, decimal_places=2)
+    # Yen. The currency has no minor unit, so prices are whole numbers.
+    base_price = models.PositiveIntegerField()
 
     class Meta:
         ordering = ["start_time"]
 
     def __str__(self):
-        return f"{self.movie.title} @ {self.venue} ({self.start_time:%Y-%m-%d %H:%M})"
+        return (
+            f"{self.movie.title} @ {self.auditorium.name} "
+            f"({self.start_time:%Y-%m-%d %H:%M})"
+        )
+
+    def price_for(self, seat_kind):
+        """What one seat of this kind costs, in yen."""
+        return self.base_price + self.auditorium.surcharge + Seat.SURCHARGES[seat_kind]
+
+    @property
+    def cheapest_price(self):
+        return self.price_for(Seat.Kind.STANDARD)
+
+    @property
+    def premium_price(self):
+        return self.price_for(Seat.Kind.PREMIUM)
 
     def clean(self):
         if self.start_time and self.start_time < timezone.now():
@@ -57,25 +108,42 @@ class Screening(models.Model):
         super().save(*args, **kwargs)
 
 
-SEAT_ROWS = 8
-SEAT_COLS = 12
-
-
-def generate_seats(screening, rows=SEAT_ROWS, cols=SEAT_COLS):
-    seats = []
-    for r in range(rows):
-        row_label = chr(65 + r)
-        for c in range(1, cols + 1):
-            seats.append(Seat(screening=screening, row=row_label, number=c))
+def generate_seats(screening):
+    """Create the seats for a screening from its auditorium's layout."""
+    layout = screening.auditorium.layout
+    seats = [
+        Seat(
+            screening=screening,
+            row=row,
+            number=number,
+            kind=layout.kind_for(row, number),
+        )
+        for row in layout.row_labels()
+        for number in range(1, layout.seats_per_row + 1)
+    ]
     Seat.objects.bulk_create(seats)
 
 
 class Seat(models.Model):
+    class Kind(models.TextChoices):
+        STANDARD = "standard", "Standard"
+        PREMIUM = "premium", "Premium"
+        WHEELCHAIR = "wheelchair", "Wheelchair space"
+
+    # Yen added on top of the screening price and the auditorium surcharge.
+    # Accessible spaces are never sold at the premium rate.
+    SURCHARGES = {
+        Kind.STANDARD: 0,
+        Kind.PREMIUM: 500,
+        Kind.WHEELCHAIR: 0,
+    }
+
     screening = models.ForeignKey(
         Screening, on_delete=models.CASCADE, related_name="seats"
     )
     row = models.CharField(max_length=10)
     number = models.PositiveIntegerField()
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.STANDARD)
 
     class Meta:
         unique_together = ("screening", "row", "number")
@@ -83,6 +151,14 @@ class Seat(models.Model):
 
     def __str__(self):
         return f"{self.row}{self.number} ({self.screening})"
+
+    @property
+    def label(self):
+        return f"{self.row}{self.number}"
+
+    @property
+    def price(self):
+        return self.screening.price_for(self.kind)
 
     @property
     def is_available(self):

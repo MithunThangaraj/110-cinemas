@@ -36,6 +36,11 @@ where each available seat is a checkbox and reserved seats are shown as
 unavailable. Up to 6 seats may be chosen and reserved as one booking; no
 customer details are collected.
 
+The map is generated from the screening's auditorium, so its size and shape
+follow the screen format (an IMAX GT house is far larger than a 4DX room).
+Seats are marked by kind — standard, premium, or wheelchair space — and each
+kind's price is shown, in yen.
+
 #### Scenario: Viewing seats for an existing screening
 - **WHEN** a browser sends `GET /screenings/<screening_id>/seats/` for a screening
   that exists
@@ -129,6 +134,40 @@ SHALL be shown as cancelled instead.
 - **WHEN** a browser sends `GET /bookings/<group_id>/` for a `group_id` with no
   reservations
 - **THEN** the response SHALL be HTTP 404
+
+### Requirement: Live seat availability
+The system SHALL expose `GET /screenings/<screening_id>/availability/`
+(name: `seat-availability`), which the seat selection page polls so the map
+stays current while a visitor is choosing.
+
+The request carries a `v` parameter holding the availability digest the client
+last rendered, and the visitor's current selection as repeated `seats`
+parameters.
+
+- **WHEN** the digest matches the screening's current availability, the
+  response SHALL be HTTP 204 with an empty body, so the client leaves the page
+  untouched. This is what keeps an idle poll from causing a visible flicker or
+  taking focus from a visitor part way through choosing.
+- **WHEN** availability has changed, the response SHALL be the reservation-area
+  fragment re-rendered with the seats now taken marked as such, and with the
+  visitor's selection preserved.
+- Any selected seat that has since been taken SHALL be dropped from the
+  selection, and the response SHALL say which seats went.
+
+#### Scenario: Polling when nothing has changed
+- **WHEN** the page polls with a digest matching current availability
+- **THEN** the response SHALL be HTTP 204 with an empty body
+
+#### Scenario: Polling after someone else books
+- **WHEN** the page polls with a stale digest
+- **THEN** the response SHALL be the reservation-area fragment showing the
+  newly taken seats, with the visitor's own selection still selected
+
+#### Scenario: A selected seat is taken by someone else
+- **WHEN** the page polls with a stale digest and one of the submitted `seats`
+  now has a confirmed reservation
+- **THEN** that seat SHALL be dropped from the selection, the visitor's other
+  seats SHALL stay selected, and the response SHALL name the seat that went
 
 ### Requirement: Cancel booking action
 The system SHALL expose `POST /bookings/<group_id>/cancel/`

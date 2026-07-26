@@ -4,7 +4,7 @@ import pytest
 from django.test import Client
 from django.utils import timezone
 
-from .models import Movie, Screening
+from .models import Auditorium, Movie, Screening
 
 
 @pytest.fixture
@@ -27,10 +27,25 @@ def movie():
 
 
 @pytest.fixture
-def future_screening(movie):
+def auditorium():
+    """A standard screen: 10 rows x 18 seats."""
+    return Auditorium.objects.create(
+        name="Screen 5", screen_format=Auditorium.Format.STANDARD, surcharge=0
+    )
+
+
+@pytest.fixture
+def imax_auditorium():
+    return Auditorium.objects.create(
+        name="IMAX GT", screen_format=Auditorium.Format.IMAX_GT, surcharge=1000
+    )
+
+
+@pytest.fixture
+def future_screening(movie, auditorium):
     return Screening.objects.create(
         movie=movie,
-        venue="Auditorium 1",
+        auditorium=auditorium,
         start_time=timezone.now() + timedelta(days=7),
-        base_price="14.50",
+        base_price=2000,
     )

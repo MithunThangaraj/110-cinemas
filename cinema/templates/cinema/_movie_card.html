@@ -1,3 +1,4 @@
+{% load humanize %}
 <li class="movie-card">
     <div class="movie-card__art">
         {% include "cinema/_poster.html" %}
@@ -21,8 +22,8 @@
             <li>
                 <a class="screening" href="{% url 'seat-selection' screening.id %}">
                     <span class="screening__when">{{ screening.start_time|date:"D j M, H:i" }}</span>
-                    <span class="screening__venue">{{ screening.venue }}</span>
-                    <span class="screening__price">&euro;{{ screening.base_price }}</span>
+                    <span class="screening__venue">{{ screening.auditorium.name }}</span>
+                    <span class="screening__price">from &yen;{{ screening.cheapest_price|intcomma }}</span>
                 </a>
             </li>
             {% empty %}

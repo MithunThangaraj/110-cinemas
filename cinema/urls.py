@@ -36,6 +36,11 @@ urlpatterns = [
         name="reserve-seats",
     ),
     path(
+        "screenings/<int:screening_id>/availability/",
+        views.seat_availability,
+        name="seat-availability",
+    ),
+    path(
         "bookings/<uuid:group_id>/",
         views.booking_confirmation,
         name="booking-confirmation",

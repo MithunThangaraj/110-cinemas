@@ -1,20 +1,38 @@
+{% load humanize %}
 <form
     class="reservation"
     method="post"
     action="{% url 'reserve-seats' screening.id %}"
     data-max-seats="{{ max_seats }}"
-    data-seat-price="{{ screening.base_price }}"
     hx-post="{% url 'reserve-seats' screening.id %}"
     hx-target="this"
     hx-swap="outerHTML"
 >
     {% csrf_token %}
 
-    <div class="theater">
+    {% comment %}
+    Keeps the map current while the visitor is choosing. The endpoint answers
+    204 when nothing has been booked since this markup was built, so an idle
+    poll causes no swap at all - no flicker, no lost focus. `hx-include` sends
+    the current selection so the re-render keeps it.
+    {% endcomment %}
+    <div
+        class="visually-hidden"
+        hx-get="{% url 'seat-availability' screening.id %}"
+        hx-trigger="every 8s"
+        hx-include="closest form"
+        hx-vals='{"v": "{{ availability }}"}'
+        hx-target="closest .reservation"
+        hx-swap="outerHTML"
+    ></div>
+
+    <div class="theater theater--{{ screening.auditorium.screen_format }}">
         <p class="screen" aria-hidden="true"><span>Screen</span></p>
 
         <fieldset class="seat-grid">
-            <legend class="visually-hidden">Choose up to {{ max_seats }} seats</legend>
+            <legend class="visually-hidden">
+                Choose up to {{ max_seats }} seats in {{ screening.auditorium.name }}
+            </legend>
             {% comment %}
             The inner wrapper is what scrolls: a fieldset defaults to
             min-width: min-content, so it cannot be a scroll container itself.
@@ -38,21 +56,23 @@
         <p class="seat-hint">Swipe the seat map sideways to reach every seat.</p>
 
         <ul class="seat-legend">
-            <li><span class="seat seat--legend"></span> Available</li>
+            <li><span class="seat seat--legend"></span> Standard &yen;{{ screening.cheapest_price|intcomma }}</li>
+            <li><span class="seat seat--legend seat--premium"></span> Premium &yen;{{ screening.premium_price|intcomma }}</li>
+            <li><span class="seat seat--legend seat--wheelchair" aria-hidden="true">&#9855;</span> Wheelchair space</li>
             <li><span class="seat seat--legend seat--legend-selected"></span> Selecting</li>
-            <li><span class="seat seat--legend seat--reserved"></span> Reserved</li>
+            <li><span class="seat seat--legend seat--reserved"></span> Taken</li>
         </ul>
     </div>
 
     <div class="checkout">
         <p class="checkout__summary">
             <span class="checkout__label">Your seats</span>
-            <strong class="checkout__seats">{% if selected_seats %}{% for seat in selected_seats %}{{ seat.row }}{{ seat.number }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}none chosen yet{% endif %}</strong>
+            <strong class="checkout__seats">{% if selected_seats %}{% for seat in selected_seats %}{{ seat.label }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}none chosen yet{% endif %}</strong>
         </p>
 
         <p class="checkout__total">
             <span>{{ selected_seats|length }} of {{ max_seats }} seats</span>
-            <span class="checkout__price">&euro;{{ screening.base_price }} each</span>
+            <span class="checkout__price">&yen;{{ selected_total|intcomma }}</span>
         </p>
 
         {% if seat_error %}
@@ -67,10 +87,11 @@
     <script>
         /* Progressive enhancement: keep the checkout in step with the seat map
            and stop the visitor picking more than the allowed number of seats.
-           The server enforces the same limit. Listeners are bound to this form,
-           which HTMX replaces wholesale on every swap, so nothing leaks.
-           Resolving the form from the running script (rather than by selector)
-           avoids binding to the outgoing form during a swap. */
+           The server enforces the same limit and recomputes the same total.
+           Listeners are bound to this form, which HTMX replaces wholesale on
+           every swap, so nothing leaks. Resolving the form from the running
+           script (rather than by selector) avoids binding to the outgoing form
+           during a swap. */
         (function () {
             var current = document.currentScript;
             var form = current
@@ -81,7 +102,6 @@
             }
 
             var maxSeats = parseInt(form.dataset.maxSeats, 10) || 1;
-            var price = parseFloat(form.dataset.seatPrice) || 0;
             var seatsOutput = form.querySelector(".checkout__seats");
             var totalOutput = form.querySelector(".checkout__total");
             var limitOutput = form.querySelector(".checkout__limit");
@@ -89,6 +109,10 @@
             var boxes = Array.prototype.slice.call(
                 form.querySelectorAll('input[name="seats"]')
             );
+
+            function yen(amount) {
+                return "¥" + amount.toLocaleString("en-US");
+            }
 
             function update() {
                 var chosen = boxes.filter(function (box) {
@@ -108,16 +132,18 @@
                           .join(", ")
                     : "none chosen yet";
 
+                var total = chosen.reduce(function (sum, box) {
+                    return sum + parseInt(box.dataset.price, 10);
+                }, 0);
+
                 totalOutput.innerHTML = "";
                 var count = document.createElement("span");
-                count.textContent =
-                    chosen.length + " of " + maxSeats + " seats";
-                var total = document.createElement("span");
-                total.className = "checkout__price";
-                total.textContent =
-                    "€" + (chosen.length * price).toFixed(2);
+                count.textContent = chosen.length + " of " + maxSeats + " seats";
+                var price = document.createElement("span");
+                price.className = "checkout__price";
+                price.textContent = yen(total);
                 totalOutput.appendChild(count);
-                totalOutput.appendChild(total);
+                totalOutput.appendChild(price);
 
                 limitOutput.textContent = atLimit
                     ? "That is the maximum of " +

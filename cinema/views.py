@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -8,7 +8,13 @@ from django_htmx.http import HttpResponseClientRedirect
 
 from .forms import MovieSearchForm
 from .models import Movie, Reservation, Screening
-from .services import MAX_SEATS_PER_BOOKING, cancel_booking, create_booking
+from .services import (
+    MAX_SEATS_PER_BOOKING,
+    availability_signature,
+    cancel_booking,
+    create_booking,
+    seats_with_availability,
+)
 
 # Session key under which we remember the bookings made in the current visit,
 # so a visitor can see "My Bookings" without needing an account.
@@ -38,20 +44,62 @@ def _reservation_context(screening, selected_seats=(), seat_error=None):
     selected_seats = list(selected_seats)
     return {
         "screening": screening,
-        "seats": screening.seats.all(),
+        "seats": seats_with_availability(screening),
+        "layout": screening.auditorium.layout,
         "selected_seats": selected_seats,
         "selected_seat_ids": [seat.id for seat in selected_seats],
+        "selected_total": sum(seat.price for seat in selected_seats),
         "max_seats": MAX_SEATS_PER_BOOKING,
         "seat_error": seat_error,
+        # Lets the seat map poll for changes without re-rendering when nothing
+        # has been booked since this page was built.
+        "availability": availability_signature(screening),
     }
 
 
+def _screening_or_404(screening_id):
+    return get_object_or_404(
+        Screening.objects.select_related("movie", "auditorium"), pk=screening_id
+    )
+
+
 def seat_selection(request, screening_id):
-    screening = get_object_or_404(Screening, pk=screening_id)
+    screening = _screening_or_404(screening_id)
     return render(
         request,
         "cinema/seat_selection.html",
         _reservation_context(screening),
+    )
+
+
+def seat_availability(request, screening_id):
+    """Poll target for the seat map.
+
+    Returns 204 when nothing has been booked since the client's last look, so
+    HTMX leaves the DOM alone — no flicker, and no focus stolen from a visitor
+    who is part way through choosing.
+    """
+    screening = _screening_or_404(screening_id)
+    if request.GET.get("v") == availability_signature(screening):
+        return HttpResponse(status=204)
+
+    # Keep whatever the visitor had chosen, minus anything just taken.
+    chosen_ids = [_parse_int(value) for value in request.GET.getlist("seats")]
+    chosen = list(seats_with_availability(screening).filter(pk__in=chosen_ids))
+    still_free = [seat for seat in chosen if not seat.taken]
+
+    seat_error = None
+    if len(still_free) < len(chosen):
+        lost = sorted(seat.label for seat in chosen if seat.taken)
+        seat_error = (
+            f"Someone just booked {', '.join(lost)}. "
+            "Your other seats are still selected."
+        )
+
+    return render(
+        request,
+        "cinema/_reservation_area.html",
+        _reservation_context(screening, still_free, seat_error),
     )
 
 
@@ -66,11 +114,13 @@ def _render_reservation_area(request, context):
 
 
 def reserve_seats(request, screening_id):
-    screening = get_object_or_404(Screening, pk=screening_id)
+    screening = _screening_or_404(screening_id)
 
     seat_ids = [_parse_int(value) for value in request.POST.getlist("seats")]
     # Only seats belonging to this screening may be booked from this page.
-    seats = list(screening.seats.filter(pk__in=[i for i in seat_ids if i]))
+    seats = list(
+        seats_with_availability(screening).filter(pk__in=[i for i in seat_ids if i])
+    )
 
     if not seats:
         return _render_reservation_area(
@@ -99,7 +149,8 @@ def reserve_seats(request, screening_id):
     if request.htmx:
         return HttpResponseClientRedirect(confirmation_url)
 
-    messages.success(request, f"Reserved {len(reservations)} seat(s).")
+    count = len(reservations)
+    messages.success(request, f"Reserved {count} seat{'' if count == 1 else 's'}.")
     return redirect(confirmation_url)
 
 
@@ -127,7 +178,12 @@ def _booked_in_this_session(request, group_id):
 def booking_confirmation(request, group_id):
     reservations = list(
         Reservation.objects.filter(group_id=group_id)
-        .select_related("seat", "seat__screening", "seat__screening__movie")
+        .select_related(
+            "seat",
+            "seat__screening",
+            "seat__screening__movie",
+            "seat__screening__auditorium",
+        )
         .order_by("seat__row", "seat__number")
     )
     if not reservations:
@@ -143,7 +199,7 @@ def booking_confirmation(request, group_id):
             "reservations": reservations,
             "screening": screening,
             "seats": [reservation.seat for reservation in reservations],
-            "total": screening.base_price * len(reservations),
+            "total": sum(reservation.seat.price for reservation in reservations),
             "status": status,
             "can_cancel": (
                 status == "confirmed" and _booked_in_this_session(request, group_id)
@@ -203,7 +259,12 @@ def my_bookings(request):
     group_ids = request.session.get(SESSION_BOOKINGS_KEY, [])
     reservations = (
         Reservation.objects.filter(group_id__in=group_ids)
-        .select_related("seat", "seat__screening", "seat__screening__movie")
+        .select_related(
+            "seat",
+            "seat__screening",
+            "seat__screening__movie",
+            "seat__screening__auditorium",
+        )
         .order_by("seat__row", "seat__number")
     )
     return render(

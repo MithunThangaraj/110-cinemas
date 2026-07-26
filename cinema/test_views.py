@@ -1,8 +1,18 @@
+import re
+from datetime import timedelta
+
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
-from .services import MAX_SEATS_PER_BOOKING, reserve_seat
+from .models import Auditorium, Screening, Seat
+from .services import (
+    MAX_SEATS_PER_BOOKING,
+    availability_signature,
+    create_booking,
+    reserve_seat,
+)
 
 
 @pytest.mark.django_db
@@ -47,6 +57,102 @@ class TestSeatSelection:
     def test_seat_selection_missing_screening_404s(self, client):
         response = client.get(reverse("seat-selection", args=[9999]))
         assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestSeatAvailabilityPolling:
+    def _url(self, screening):
+        return reverse("seat-availability", args=[screening.id])
+
+    def _chosen_seats(self, response):
+        """The seat labels the re-rendered checkout says are selected."""
+        match = re.search(
+            r'<strong class="checkout__seats">(.*?)</strong>',
+            response.content.decode(),
+            re.S,
+        )
+        listed = match.group(1).strip()
+        if listed == "none chosen yet":
+            return []
+        return [label.strip() for label in listed.split(",")]
+
+    def test_no_change_returns_204_so_htmx_leaves_the_dom_alone(
+        self, client, future_screening
+    ):
+        signature = availability_signature(future_screening)
+        response = client.get(self._url(future_screening), {"v": signature})
+        assert response.status_code == 204
+        assert response.content == b""
+
+    def test_a_new_booking_makes_the_map_refresh(self, client, future_screening):
+        stale = availability_signature(future_screening)
+        create_booking([future_screening.seats.first().id])
+
+        response = client.get(self._url(future_screening), {"v": stale})
+
+        assert response.status_code == 200
+        assert b"<html" not in response.content
+
+    def test_refresh_keeps_the_seats_the_visitor_had_chosen(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:3])
+        stale = availability_signature(future_screening)
+        # Somebody else books a seat this visitor had not chosen.
+        create_booking([future_screening.seats.all()[10].id])
+
+        response = client.get(
+            self._url(future_screening),
+            {"v": stale, "seats": [seat.id for seat in seats]},
+        )
+
+        chosen = self._chosen_seats(response)
+        assert chosen == [seat.label for seat in seats]
+
+    def test_refresh_drops_and_reports_a_seat_someone_else_took(
+        self, client, future_screening
+    ):
+        seats = list(future_screening.seats.all()[:3])
+        stale = availability_signature(future_screening)
+        create_booking([seats[0].id])
+
+        response = client.get(
+            self._url(future_screening),
+            {"v": stale, "seats": [seat.id for seat in seats]},
+        )
+
+        body = response.content.decode()
+        assert f"Someone just booked {seats[0].label}" in body
+        # The seat that went is dropped; the other two stay chosen.
+        assert self._chosen_seats(response) == [seats[1].label, seats[2].label]
+
+    def test_signature_changes_when_a_seat_is_booked(self, future_screening):
+        before = availability_signature(future_screening)
+        create_booking([future_screening.seats.first().id])
+        assert availability_signature(future_screening) != before
+
+    def test_missing_screening_404s(self, client):
+        response = client.get(reverse("seat-availability", args=[9999]))
+        assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestSeatMapQueryCount:
+    def test_seat_map_does_not_scale_queries_with_seat_count(
+        self, client, django_assert_max_num_queries, movie, imax_auditorium
+    ):
+        """Seat.is_available would be one query per seat - 468 of them here."""
+        screening = Screening.objects.create(
+            movie=movie,
+            auditorium=imax_auditorium,
+            start_time=timezone.now() + timedelta(days=2),
+            base_price=2000,
+        )
+        assert screening.seats.count() == 468
+
+        with django_assert_max_num_queries(12):
+            response = client.get(reverse("seat-selection", args=[screening.id]))
+        assert response.status_code == 200
 
 
 @pytest.mark.django_db
@@ -103,17 +209,11 @@ class TestReserveSeats:
     def test_seat_from_another_screening_is_ignored(
         self, client, future_screening, movie
     ):
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        from .models import Screening
-
         other = Screening.objects.create(
             movie=movie,
-            venue="Other",
+            auditorium=Auditorium.objects.create(name="Screen 9"),
             start_time=timezone.now() + timedelta(days=5),
-            base_price="10.00",
+            base_price=2000,
         )
         foreign_seat = other.seats.first()
         response = client.post(
@@ -201,8 +301,8 @@ class TestBookingConfirmation:
         assert response.status_code == 200
         for seat in seats:
             assert f"{seat.row}{seat.number}".encode() in response.content
-        # 3 seats at the screening's base price of 14.50.
-        assert b"43.50" in response.content
+        # Three standard seats at the base price of 2,000 yen.
+        assert b"6,000" in response.content
 
     def test_unknown_booking_404s(self, client):
         response = client.get(

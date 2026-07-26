@@ -1,19 +1,24 @@
-{% if seat.is_available %}
-<label class="seat seat--available">
+{% if not seat.taken %}
+<label class="seat seat--available seat--{{ seat.kind }}{% if seat.number in layout.aisles %} seat--aisle{% endif %}">
     <input
         type="checkbox"
         name="seats"
         value="{{ seat.id }}"
         class="visually-hidden"
-        data-code="{{ seat.row }}{{ seat.number }}"
-        aria-label="Seat {{ seat.row }}{{ seat.number }}, available"
+        data-code="{{ seat.label }}"
+        data-price="{{ seat.price }}"
+        aria-label="Seat {{ seat.label }}, {{ seat.get_kind_display|lower }}, &yen;{{ seat.price }}, available"
         {% if seat.id in selected_seat_ids %}checked{% endif %}
     >
-    <span class="seat__code" aria-hidden="true">{{ seat.number }}</span>
+    <span class="seat__code" aria-hidden="true">
+        {% if seat.kind == "wheelchair" %}&#9855;{% else %}{{ seat.number }}{% endif %}
+    </span>
 </label>
 {% else %}
-<span class="seat seat--reserved">
-    <span class="seat__code" aria-hidden="true">{{ seat.number }}</span>
-    <span class="visually-hidden">Seat {{ seat.row }}{{ seat.number }}, reserved</span>
+<span class="seat seat--reserved seat--{{ seat.kind }}{% if seat.number in layout.aisles %} seat--aisle{% endif %}">
+    <span class="seat__code" aria-hidden="true">
+        {% if seat.kind == "wheelchair" %}&#9855;{% else %}{{ seat.number }}{% endif %}
+    </span>
+    <span class="visually-hidden">Seat {{ seat.label }}, taken</span>
 </span>
 {% endif %}

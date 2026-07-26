@@ -17,7 +17,7 @@
                 <span class="booking__movie">{{ booking.screening.movie.title }}</span>
                 <span class="booking__meta">
                     {{ booking.screening.start_time|date:"D j M, H:i" }}
-                    &middot; {{ booking.screening.venue }}
+                    &middot; {{ booking.screening.auditorium.name }}
                 </span>
             </span>
             <span class="booking__status booking__status--{{ booking.status }}">

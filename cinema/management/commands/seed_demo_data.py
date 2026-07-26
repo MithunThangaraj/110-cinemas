@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from cinema.models import Movie, Screening
+from cinema.models import Auditorium, Movie, Screening
 
 # (title, description, release_date, runtime_minutes)
 #
@@ -75,27 +75,53 @@ DEMO_MOVIES = [
     ),
 ]
 
-# (venue, days from now, hour, price)
+# (name, screen format, surcharge in yen). Surcharges follow Japanese
+# multiplex pricing: premium formats cost more, 4DX most of all.
+DEMO_AUDITORIUMS = [
+    ("IMAX GT", Auditorium.Format.IMAX_GT, 1000),
+    ("Dolby Cinema", Auditorium.Format.DOLBY, 1000),
+    ("4DX Screen 3", Auditorium.Format.FOUR_DX, 1200),
+    ("Screen 5", Auditorium.Format.STANDARD, 0),
+    ("Screen 6", Auditorium.Format.STANDARD, 0),
+]
+
+# The standard adult ticket; the auditorium and the seat add to it.
+BASE_PRICE_YEN = 2000
+
+# (auditorium name, days from now, hour)
 DEMO_SCREENINGS = [
-    ("Screen 1 - IMAX", 1, 18, "18.50"),
-    ("Screen 2", 1, 21, "14.50"),
-    ("Screen 3 - Dolby", 2, 20, "16.00"),
-    ("Screen 2", 3, 15, "12.00"),
+    ("IMAX GT", 1, 18),
+    ("Screen 5", 1, 21),
+    ("Dolby Cinema", 2, 20),
+    ("4DX Screen 3", 2, 17),
+    ("Screen 6", 3, 15),
 ]
 
 
-def create_screenings(movie, schedule, now):
-    """Create one Screening per (venue, days, hour, price) entry."""
-    for venue, days, hour, price in schedule:
+def create_auditoriums():
+    """Create the screens, one per format plus a second standard room."""
+    auditoriums = {}
+    for name, screen_format, surcharge in DEMO_AUDITORIUMS:
+        auditoriums[name], _ = Auditorium.objects.get_or_create(
+            name=name,
+            defaults={"screen_format": screen_format, "surcharge": surcharge},
+        )
+    return auditoriums
+
+
+def create_screenings(movie, schedule, now, auditoriums):
+    """Create one Screening per (auditorium, days, hour) entry."""
+    for name, days, hour in schedule:
         start_time = (now + timedelta(days=days)).replace(
             hour=hour, minute=0, second=0, microsecond=0
         )
-        # Saving a Screening generates its seats via a post_save signal.
+        # Saving a Screening generates its seats via a post_save signal, laid
+        # out according to the auditorium's format.
         Screening.objects.create(
             movie=movie,
-            venue=venue,
+            auditorium=auditoriums[name],
             start_time=start_time,
-            base_price=price,
+            base_price=BASE_PRICE_YEN,
         )
 
 
@@ -107,6 +133,7 @@ class Command(BaseCommand):
             self.stdout.write("Movies already exist - skipping demo data.")
             return
 
+        auditoriums = create_auditoriums()
         now = timezone.now()
         for index, details in enumerate(DEMO_MOVIES):
             title, description, release_date, runtime = details
@@ -118,7 +145,7 @@ class Command(BaseCommand):
             )
             # Stagger how many screenings each movie gets so the listing looks
             # like a real schedule rather than the same rows repeated.
-            create_screenings(movie, DEMO_SCREENINGS[: 2 + index % 3], now)
+            create_screenings(movie, DEMO_SCREENINGS[: 2 + index % 3], now, auditoriums)
 
         self.stdout.write(
             self.style.SUCCESS(
