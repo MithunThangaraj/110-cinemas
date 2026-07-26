@@ -30,6 +30,7 @@ Set up the database and fill it with the demo catalogue:
 uv run python manage.py migrate
 uv run python manage.py seed_demo_data
 uv run python manage.py fetch_posters
+uv run python manage.py fetch_menu_images
 ```
 
 Start it:
@@ -40,10 +41,10 @@ uv run python manage.py runserver
 
 Then open **http://localhost:8000/**.
 
-That's it. `seed_demo_data` creates nine films and five auditoriums covering
-all four screen formats; `fetch_posters` pulls the real posters (see
-[Posters](#posters) — no API key needed). Both are safe to re-run: seeding does
-nothing once movies exist.
+That's it. `seed_demo_data` creates nine films, five auditoriums covering all
+four screen formats, and the concession menu; the two `fetch_` commands pull
+real pictures for them (no API key needed — see [Pictures](#pictures)). All
+three are safe to re-run.
 
 ### Optional: the Django admin
 
@@ -122,6 +123,15 @@ every seat back on sale. Because there are no accounts, a booking belongs to the
 browser session that made it: cancelling requires the booking's group ID to be
 in that session, so a leaked booking link cannot release someone else's seats.
 
+### Food and drink
+
+The concession menu lives at `/menu/` and can be added to a booking on the
+details step: pick quantities and the total updates as you go.
+
+Menu items are priced in yen like tickets. `BookingItem` stores a **snapshot**
+of the price at the time of the order, so changing the menu later cannot alter
+what an existing booking came to.
+
 ### Live seat availability
 
 The seat map polls `GET /screenings/<id>/availability/` every 8 seconds. Two
@@ -133,32 +143,45 @@ things keep that from being annoying:
 - The poll sends the current selection (`hx-include`), so a refresh keeps your
   seats. If one was taken meanwhile, it is dropped and the page says which.
 
-### Posters
+### Pictures
 
-Posters come from Apple's **iTunes Search API**, which is free and needs no key
-or account — so there is nothing to configure, locally or in production:
+Both sources are free and need no API key or account, so there is nothing to
+configure, locally or in production.
 
 ```bash
-uv run python manage.py fetch_posters          # fill in missing posters
-uv run python manage.py fetch_posters --force  # look them all up again
+uv run python manage.py fetch_posters       # film posters
+uv run python manage.py fetch_menu_images   # concession photographs
 ```
 
-Only an **exact** title match is accepted (see
-[`cinema/posters.py`](cinema/posters.py)): the API readily returns loosely
-related films, and the wrong poster is worse than none. Its film coverage is
-incomplete, so a movie with no match keeps its generated key-art — a coloured
-card whose palette comes from the title — instead of showing a broken image.
-Set `Movie.poster_image` in the admin to override either result.
+**Posters** come from Apple's **iTunes Search API**
+([`cinema/posters.py`](cinema/posters.py)). Only an **exact** title match is
+accepted: the API readily returns loosely related films, and the wrong poster
+is worse than none. Its film coverage is incomplete, so a movie with no match
+keeps its generated key-art — a coloured card whose palette comes from the
+title — instead of showing a broken image.
+
+**Menu photographs** come from **Wikimedia Commons**
+([`cinema/commons.py`](cinema/commons.py)). Everything there is freely
+licensed, which is why the menu can use real photographs where film posters
+cannot. Files are looked up by exact title rather than by search — a search for
+"nachos" returns a portrait of the man who invented them — so each item stores
+the Commons file title in `image_source`. The photographer and licence are
+stored alongside and shown under each item, since some licences ask for credit.
+
+Set `Movie.poster_image` or `MenuItem.image_url` by hand in the admin to
+override either result.
 
 ## Where things live
 
 ```
 cinema/
-  models.py      Movie, Auditorium, Screening, Seat, Reservation
+  models.py      Movie, Auditorium, Screening, Seat, Reservation,
+                 MenuItem, BookingItem
   layouts.py     seat layout per screen format
   services.py    booking, cancelling, availability - the business rules
   views.py       thin views; HTMX partials for the seat map
-  posters.py     poster lookup
+  posters.py     poster lookup (iTunes)
+  commons.py     menu photo lookup (Wikimedia Commons)
   templates/     page templates and partials
   static/        the stylesheet
 openspec/specs/  what the app is specified to do

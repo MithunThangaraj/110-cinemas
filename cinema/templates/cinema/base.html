@@ -27,6 +27,12 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{% url 'menu' %}"
+                            {% if request.resolver_match.url_name == 'menu' %}aria-current="page"{% endif %}>
+                            Food &amp; Drink
+                        </a>
+                    </li>
+                    <li>
                         <a href="{% url 'my-bookings' %}"
                             {% if request.resolver_match.url_name == 'my-bookings' %}aria-current="page"{% endif %}>
                             My Bookings

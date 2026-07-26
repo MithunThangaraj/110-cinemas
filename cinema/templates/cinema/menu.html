@@ -1,0 +1,50 @@
+{% extends "cinema/base.html" %}
+{% load humanize %}
+
+{% block title %}Food &amp; Drink - 110 Cinemas{% endblock %}
+
+{% block content %}
+<h2 class="page-title">Food &amp; Drink</h2>
+<p class="page-lead">
+    Order at the counter, or add it to your booking when you choose your seats.
+</p>
+
+{% for group in menu %}
+<section class="menu-section">
+    <h3 class="menu-section__title">{{ group.name }}</h3>
+    <ul class="menu-grid">
+        {% for item in group.items %}
+        <li class="menu-card">
+            <div class="menu-card__art">
+                {% if item.image_url %}
+                <img
+                    class="menu-card__photo"
+                    src="{{ item.image_url }}"
+                    alt="{{ item.name }}"
+                    loading="lazy"
+                >
+                {% else %}
+                <span class="menu-card__photo menu-card__photo--none" aria-hidden="true"></span>
+                {% endif %}
+            </div>
+            <div class="menu-card__body">
+                <h4 class="menu-card__name">{{ item.name }}</h4>
+                {% if item.description %}
+                <p class="menu-card__description">{{ item.description }}</p>
+                {% endif %}
+                <p class="menu-card__price">&yen;{{ item.price|intcomma }}</p>
+                {% if item.image_credit %}
+                <p class="menu-card__credit">Photo: {{ item.image_credit }}</p>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% empty %}
+<div class="empty-state">
+    <p>The menu is empty.</p>
+    <a class="button" href="{% url 'movie-list' %}">Browse movies</a>
+</div>
+{% endfor %}
+{% endblock %}

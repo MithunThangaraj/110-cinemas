@@ -12,6 +12,7 @@ and the view returns them to the seat map.
     hx-post="{% url 'reserve-seats' screening.id %}"
     hx-target="this"
     hx-swap="outerHTML"
+    data-seats-total="{{ selected_total }}"
 >
     {% csrf_token %}
     {% for seat in selected_seats %}
@@ -35,6 +36,58 @@ and the view returns them to the seat map.
         </p>
     </div>
 
+    {% if menu %}
+    <fieldset class="extras">
+        <legend class="extras__title">Anything from the counter?</legend>
+        <p class="extras__lead">Optional. Collect it on your way in.</p>
+
+        {% for group in menu %}
+        <h4 class="extras__group">{{ group.name }}</h4>
+        <ul class="extras__list">
+            {% for item in group.items %}
+            <li class="extra">
+                {% if item.image_url %}
+                <img class="extra__photo" src="{{ item.image_url }}" alt="" loading="lazy">
+                {% else %}
+                <span class="extra__photo extra__photo--none" aria-hidden="true"></span>
+                {% endif %}
+                <span class="extra__info">
+                    <span class="extra__name">{{ item.name }}</span>
+                    <span class="extra__price">&yen;{{ item.price|intcomma }}</span>
+                </span>
+                <span class="extra__qty">
+                    <label class="visually-hidden" for="id_item_{{ item.id }}">
+                        Quantity of {{ item.name }}
+                    </label>
+                    <input
+                        type="number"
+                        id="id_item_{{ item.id }}"
+                        name="item_{{ item.id }}"
+                        value="{{ item.chosen_quantity }}"
+                        min="0"
+                        max="{{ max_item_quantity }}"
+                        step="1"
+                        inputmode="numeric"
+                        data-price="{{ item.price }}"
+                    >
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endfor %}
+
+        <p class="details__total details__total--extras">
+            <span>Food &amp; drink</span>
+            <span class="checkout__price extras__total">&yen;{{ extras_total|intcomma }}</span>
+        </p>
+    </fieldset>
+    {% endif %}
+
+    <p class="details__grand-total">
+        <span>Total</span>
+        <strong class="details__grand-total-value">&yen;{{ grand_total|intcomma }}</strong>
+    </p>
+
     {% for field in form %}
     <div class="form-field">
         {{ field.label_tag }}
@@ -45,6 +98,50 @@ and the view returns them to the seat map.
         {{ field.errors }}
     </div>
     {% endfor %}
+
+    <script>
+        /* Keeps the food and grand totals in step with the quantity boxes. The
+           server recomputes both from the submitted quantities, so this is
+           only a preview. Bound to this form, which HTMX replaces wholesale. */
+        (function () {
+            var current = document.currentScript;
+            var form = current
+                ? current.closest(".details")
+                : document.querySelector(".details");
+            if (!form) {
+                return;
+            }
+
+            var seatsTotal = parseInt(form.dataset.seatsTotal, 10) || 0;
+            var extrasOutput = form.querySelector(".extras__total");
+            var grandOutput = form.querySelector(".details__grand-total-value");
+            var boxes = Array.prototype.slice.call(
+                form.querySelectorAll('input[name^="item_"]')
+            );
+            if (!extrasOutput || !grandOutput) {
+                return;
+            }
+
+            function yen(amount) {
+                return "\u00a5" + amount.toLocaleString("en-US");
+            }
+
+            function update() {
+                var extras = boxes.reduce(function (sum, box) {
+                    var quantity = parseInt(box.value, 10);
+                    if (isNaN(quantity) || quantity < 0) {
+                        return sum;
+                    }
+                    return sum + quantity * parseInt(box.dataset.price, 10);
+                }, 0);
+                extrasOutput.textContent = yen(extras);
+                grandOutput.textContent = yen(seatsTotal + extras);
+            }
+
+            form.addEventListener("input", update);
+            update();
+        })();
+    </script>
 
     <div class="details__actions">
         <button type="submit" name="step" value="details">Confirm booking</button>

@@ -5,10 +5,13 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 
-from .models import Reservation, Seat
+from .models import BookingItem, MenuItem, Reservation, Seat
 
 # How many seats one visitor may reserve in a single booking.
 MAX_SEATS_PER_BOOKING = 6
+
+# How many of any one menu item can go on a booking.
+MAX_ITEM_QUANTITY = 10
 
 
 def validate_selection(seat_ids):
@@ -77,9 +80,31 @@ def availability_signature(screening):
     return hashlib.sha256(joined.encode()).hexdigest()[:16]
 
 
+def parse_item_quantities(data, items):
+    """Read requested quantities out of submitted form data.
+
+    Returns [(item, quantity)] for anything with a sensible quantity, ignoring
+    blanks, zeroes and junk rather than failing the whole booking over a stray
+    value in an optional field.
+    """
+    chosen = []
+    for item in items:
+        raw = data.get(f"item_{item.id}")
+        try:
+            quantity = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if quantity <= 0:
+            continue
+        chosen.append((item, min(quantity, MAX_ITEM_QUANTITY)))
+    return chosen
+
+
 @transaction.atomic
-def create_booking(seat_ids, customer_name="", customer_email=""):
+def create_booking(seat_ids, customer_name="", customer_email="", items=()):
     """Reserve several seats as one booking, or none of them at all.
+
+    `items` is [(MenuItem, quantity)] to add to the same booking.
 
     Returns the created reservations, which all share a `group_id`.
     """
@@ -107,7 +132,7 @@ def create_booking(seat_ids, customer_name="", customer_email=""):
         raise ValidationError("Some of those seats have already been reserved.")
 
     group_id = uuid.uuid4()
-    return [
+    reservations = [
         Reservation.objects.create(
             seat=seat,
             group_id=group_id,
@@ -116,6 +141,17 @@ def create_booking(seat_ids, customer_name="", customer_email=""):
         )
         for seat in seats
     ]
+
+    for item, quantity in items:
+        BookingItem.objects.create(
+            group_id=group_id,
+            item=item,
+            quantity=quantity,
+            # Snapshot the price: the menu can change, this order cannot.
+            unit_price=item.price,
+        )
+
+    return reservations
 
 
 def reserve_seat(seat_id, customer_name="", customer_email=""):
@@ -146,3 +182,18 @@ def cancel_booking(group_id):
         reservation.status = Reservation.Status.CANCELLED
         reservation.save(update_fields=["status"])
     return reservations
+
+
+def booking_extras(group_id):
+    """The menu items added to a booking, and what they came to."""
+    lines = list(BookingItem.objects.filter(group_id=group_id).select_related("item"))
+    return lines, sum(line.line_total for line in lines)
+
+
+def menu_by_category():
+    """Available menu items, grouped for display."""
+    items = MenuItem.objects.filter(is_available=True)
+    grouped = {}
+    for item in items:
+        grouped.setdefault(item.get_category_display(), []).append(item)
+    return [{"name": name, "items": rows} for name, rows in grouped.items()]
