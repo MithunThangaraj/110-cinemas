@@ -80,12 +80,17 @@ uv run black .          # format
 A screening runs in an **`Auditorium`**, whose format decides both its seat map
 and its price. The layouts live in [`cinema/layouts.py`](cinema/layouts.py):
 
-| Format | Layout | Seats | Surcharge |
-| --- | --- | --- | --- |
-| IMAX GT | 18 rows x 26 | 468 | +¥1,000 |
-| Dolby Cinema | 13 rows x 22 | 286 | +¥1,000 |
-| 4DX | 8 rows x 14 | 112 | +¥1,200 |
-| Standard | 10 rows x 18 | 180 | — |
+| Format | Rows | Seats per row (front → back) | Total | Surcharge |
+| --- | --- | --- | --- | --- |
+| IMAX GT | 18 | 18 → 26 | 432 | +¥1,000 |
+| Dolby Cinema | 13 | 18 → 22 | 276 | +¥1,000 |
+| 4DX | 8 | 12 → 14 | 109 | +¥1,200 |
+| Standard | 10 | 15 → 18 | 174 | — |
+
+Rows **taper toward the screen**: the front rows are closest to it and hold
+fewer seats, so the map is a trapezoid rather than a block. Aisles are measured
+in from each end of a row, so they stay lined up even though rows differ in
+length.
 
 Prices are in yen, which has no minor unit, so `base_price` is a whole number.
 One seat costs `screening.base_price + auditorium.surcharge + seat surcharge`,
@@ -97,12 +102,20 @@ sold at the premium rate, even when they sit inside the premium block.
 
 ### Booking
 
-A visitor picks up to **6 seats** and reserves them in one step — no name,
-email, or account. Seats booked together share a `group_id` and are reserved
-all-or-nothing: if any one of them is taken in the meantime, none are booked.
-The limit lives in [`cinema/services.py`](cinema/services.py) as
-`MAX_SEATS_PER_BOOKING` and is enforced on the server; the browser only mirrors
-it.
+Booking is two steps and needs no account:
+
+1. **Choose seats** — up to 6, on the map.
+2. **Say who it is for** — a name and email, then confirm.
+
+The chosen seats travel with the form as hidden inputs rather than sitting in
+the session, so a stale tab cannot book seats you have forgotten about. Nothing
+is held while you type: if a seat goes in the meantime the booking fails
+cleanly and you are returned to the map.
+
+Seats booked together share a `group_id` and are reserved all-or-nothing: if
+any one of them is taken, none are booked. The limit lives in
+[`cinema/services.py`](cinema/services.py) as `MAX_SEATS_PER_BOOKING` and is
+enforced on the server; the browser only mirrors it.
 
 A booking can be cancelled from the ticket or from **My Bookings**, which puts
 every seat back on sale. Because there are no accounts, a booking belongs to the

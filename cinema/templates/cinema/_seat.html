@@ -1,5 +1,5 @@
 {% if not seat.taken %}
-<label class="seat seat--available seat--{{ seat.kind }}{% if seat.number in layout.aisles %} seat--aisle{% endif %}">
+<label class="seat seat--available seat--{{ seat.kind }}{% if seat.is_aisle %} seat--aisle{% endif %}">
     <input
         type="checkbox"
         name="seats"
@@ -15,7 +15,7 @@
     </span>
 </label>
 {% else %}
-<span class="seat seat--reserved seat--{{ seat.kind }}{% if seat.number in layout.aisles %} seat--aisle{% endif %}">
+<span class="seat seat--reserved seat--{{ seat.kind }}{% if seat.is_aisle %} seat--aisle{% endif %}">
     <span class="seat__code" aria-hidden="true">
         {% if seat.kind == "wheelchair" %}&#9855;{% else %}{{ seat.number }}{% endif %}
     </span>

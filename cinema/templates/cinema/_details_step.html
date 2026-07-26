@@ -1,0 +1,55 @@
+{% load humanize %}
+{% comment %}
+Step two. The chosen seats travel with the form as hidden inputs rather than
+sitting in the session, so a stale tab cannot book seats the visitor forgot
+about. Nothing is held while they type: if a seat goes, `create_booking` fails
+and the view returns them to the seat map.
+{% endcomment %}
+<form
+    class="details"
+    method="post"
+    action="{% url 'reserve-seats' screening.id %}"
+    hx-post="{% url 'reserve-seats' screening.id %}"
+    hx-target="this"
+    hx-swap="outerHTML"
+>
+    {% csrf_token %}
+    {% for seat in selected_seats %}
+    <input type="hidden" name="seats" value="{{ seat.id }}">
+    {% endfor %}
+
+    <h3 class="details__title">Who is this booking for?</h3>
+
+    <div class="details__summary">
+        <p class="details__seats">
+            <span class="checkout__label">Your seats</span>
+            <strong>{% for seat in selected_seats %}{{ seat.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</strong>
+        </p>
+        <p class="details__meta">
+            {{ screening.movie.title }} &middot; {{ screening.auditorium.name }}
+            &middot; {{ screening.start_time|date:"D j M, H:i" }}
+        </p>
+        <p class="details__total">
+            <span>{{ selected_seats|length }} seat{{ selected_seats|pluralize }}</span>
+            <span class="checkout__price">&yen;{{ selected_total|intcomma }}</span>
+        </p>
+    </div>
+
+    {% for field in form %}
+    <div class="form-field">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+        <p class="form-field__help">{{ field.help_text }}</p>
+        {% endif %}
+        {{ field.errors }}
+    </div>
+    {% endfor %}
+
+    <div class="details__actions">
+        <button type="submit" name="step" value="details">Confirm booking</button>
+        <button type="submit" name="step" value="seats" class="button--ghost" formnovalidate>
+            Back to seats
+        </button>
+    </div>
+</form>

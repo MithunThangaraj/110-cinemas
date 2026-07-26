@@ -6,14 +6,16 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import HttpResponseClientRedirect
 
-from .forms import MovieSearchForm
+from .forms import MovieSearchForm, ReservationForm
 from .models import Movie, Reservation, Screening
 from .services import (
     MAX_SEATS_PER_BOOKING,
     availability_signature,
     cancel_booking,
     create_booking,
+    seat_rows,
     seats_with_availability,
+    validate_selection,
 )
 
 # Session key under which we remember the bookings made in the current visit,
@@ -44,7 +46,7 @@ def _reservation_context(screening, selected_seats=(), seat_error=None):
     selected_seats = list(selected_seats)
     return {
         "screening": screening,
-        "seats": seats_with_availability(screening),
+        "seat_rows": seat_rows(screening),
         "layout": screening.auditorium.layout,
         "selected_seats": selected_seats,
         "selected_seat_ids": [seat.id for seat in selected_seats],
@@ -113,7 +115,26 @@ def _render_reservation_area(request, context):
     return render(request, template, context)
 
 
+def _render_details_step(request, screening, seats, form):
+    """The step that asks who the booking is for."""
+    context = {
+        "screening": screening,
+        "selected_seats": seats,
+        "selected_total": sum(seat.price for seat in seats),
+        "form": form,
+    }
+    template = (
+        "cinema/_details_step.html" if request.htmx else "cinema/booking_details.html"
+    )
+    return render(request, template, context)
+
+
 def reserve_seats(request, screening_id):
+    """Choose seats, then say who the booking is for, then book.
+
+    One view handles both steps so the chosen seats travel with the form rather
+    than being parked in the session, where they would go stale.
+    """
     screening = _screening_or_404(screening_id)
 
     seat_ids = [_parse_int(value) for value in request.POST.getlist("seats")]
@@ -128,14 +149,56 @@ def reserve_seats(request, screening_id):
             _reservation_context(screening, seat_error="Please choose a seat first."),
         )
 
+    # Check the selection before walking the visitor through the details step
+    # only to fail at the end.
     try:
-        reservations = create_booking([seat.id for seat in seats])
+        validate_selection([seat.id for seat in seats])
     except ValidationError as error:
+        return _render_reservation_area(
+            request,
+            _reservation_context(screening, seats, seat_error=error.messages[0]),
+        )
+
+    if any(seat.taken for seat in seats):
         return _render_reservation_area(
             request,
             _reservation_context(
                 screening,
-                selected_seats=seats,
+                selected_seats=[seat for seat in seats if not seat.taken],
+                seat_error="Some of those seats have already been reserved.",
+            ),
+        )
+
+    step = request.POST.get("step")
+
+    if step == "seats":
+        # "Back" from the details step: return to the map, selection intact.
+        return _render_reservation_area(
+            request, _reservation_context(screening, selected_seats=seats)
+        )
+
+    if step != "details":
+        # Seats chosen; ask who they are for.
+        return _render_details_step(request, screening, seats, ReservationForm())
+
+    form = ReservationForm(request.POST)
+    if not form.is_valid():
+        return _render_details_step(request, screening, seats, form)
+
+    try:
+        reservations = create_booking(
+            [seat.id for seat in seats],
+            customer_name=form.cleaned_data["customer_name"],
+            customer_email=form.cleaned_data["customer_email"],
+        )
+    except ValidationError as error:
+        # Seats are not held while the visitor types, so one may have gone.
+        # Send them back to the map rather than leaving them on a dead form.
+        return _render_reservation_area(
+            request,
+            _reservation_context(
+                screening,
+                selected_seats=[seat for seat in seats if not seat.taken],
                 seat_error=error.messages[0],
             ),
         )
@@ -200,6 +263,8 @@ def booking_confirmation(request, group_id):
             "screening": screening,
             "seats": [reservation.seat for reservation in reservations],
             "total": sum(reservation.seat.price for reservation in reservations),
+            "booked_by": reservations[0].customer_name,
+            "booked_email": reservations[0].customer_email,
             "status": status,
             "can_cancel": (
                 status == "confirmed" and _booked_in_this_session(request, group_id)

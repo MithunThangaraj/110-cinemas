@@ -756,6 +756,10 @@ button:hover,
 .seat-row__seats {
   display: flex;
   gap: 0.3rem;
+  /* Rows nearest the screen hold fewer seats, so they have to sit centred
+     between the row labels rather than starting at the left edge. */
+  flex: 1;
+  justify-content: center;
 }
 
 /* Aisle positions come from the auditorium's layout, so the template marks the
@@ -954,6 +958,68 @@ button:hover,
 
 .checkout button {
   width: 100%;
+}
+
+/* --- Details step --- */
+
+.details {
+  display: block;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.details__title {
+  margin: 0 0 var(--space-3);
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+}
+
+.details__summary {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--line-strong);
+}
+
+.details__seats {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  color: var(--accent-soft);
+}
+
+.details__meta {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.details__total {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.details__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.details__actions button {
+  flex: 1 1 10rem;
+}
+
+.form-field__help {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .form-field {

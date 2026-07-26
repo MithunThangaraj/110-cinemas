@@ -38,16 +38,15 @@
             min-width: min-content, so it cannot be a scroll container itself.
             {% endcomment %}
             <div class="seat-map">
-                {% regroup seats by row as seat_rows %}
                 {% for row in seat_rows %}
                 <div class="seat-row">
-                    <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
+                    <span class="seat-row__label" aria-hidden="true">{{ row.label }}</span>
                     <div class="seat-row__seats">
-                        {% for seat in row.list %}
+                        {% for seat in row.seats %}
                         {% include "cinema/_seat.html" %}
                         {% endfor %}
                     </div>
-                    <span class="seat-row__label" aria-hidden="true">{{ row.grouper }}</span>
+                    <span class="seat-row__label" aria-hidden="true">{{ row.label }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -81,7 +80,7 @@
 
         <p class="checkout__limit" role="status"></p>
 
-        <button type="submit">Reserve seats</button>
+        <button type="submit">Continue</button>
     </div>
 
     <script>
@@ -152,11 +151,12 @@
                     : "";
 
                 if (chosen.length === 0) {
-                    button.textContent = "Reserve seats";
+                    button.textContent = "Continue";
                 } else if (chosen.length === 1) {
-                    button.textContent = "Reserve seat";
+                    button.textContent = "Continue with 1 seat";
                 } else {
-                    button.textContent = "Reserve " + chosen.length + " seats";
+                    button.textContent =
+                        "Continue with " + chosen.length + " seats";
                 }
                 form.classList.toggle("reservation--chosen", chosen.length > 0);
             }

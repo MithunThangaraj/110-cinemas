@@ -35,6 +35,12 @@
                     <dt>Total</dt>
                     <dd>&yen;{{ total|intcomma }}</dd>
                 </div>
+                {% if booked_by %}
+                <div>
+                    <dt>Booked by</dt>
+                    <dd>{{ booked_by }}<br>{{ booked_email }}</dd>
+                </div>
+                {% endif %}
                 <div>
                     <dt>Booking reference</dt>
                     <dd class="ticket__code">{{ group_id }}</dd>

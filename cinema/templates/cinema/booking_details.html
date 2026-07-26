@@ -1,0 +1,10 @@
+{% extends "cinema/base.html" %}
+{% load humanize %}
+
+{% block title %}Your details - 110 Cinemas{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'seat-selection' screening.id %}">&larr; Back to seats</a>
+
+{% include "cinema/_details_step.html" %}
+{% endblock %}
