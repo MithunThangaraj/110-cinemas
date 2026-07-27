@@ -83,6 +83,28 @@
         <a class="button button--ghost" href="{% url 'movie-list' %}">Book another</a>
     </p>
 
+    {% if review_url %}
+    {% comment %}
+    A separate site, so this opens in a new tab and carries rel="noopener" -
+    without it the opened page can reach back through window.opener.
+    {% endcomment %}
+    <p class="confirmation__review">
+        <a
+            class="button button--review"
+            href="{{ review_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+            Watch and review
+            <span class="button__external" aria-hidden="true">&#8599;</span>
+            <span class="visually-hidden">(opens the review site in a new tab)</span>
+        </a>
+        <span class="confirmation__review-note">
+            Seen it? Rate it on our review site.
+        </span>
+    </p>
+    {% endif %}
+
     {% if can_cancel %}
     <div class="confirmation__cancel">
         {% include "cinema/_cancel_form.html" with reference=booking.reference %}

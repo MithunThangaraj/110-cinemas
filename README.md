@@ -143,11 +143,11 @@ Booking is two steps and needs no account:
 
 A member's details are filled in for them. The chosen seats travel with the
 form as hidden inputs rather than sitting in the session, so a stale tab cannot
-book seats you have forgotten about. Nothing is held while you type: if a seat goes in the meantime the booking fails
-cleanly and you are returned to the map.
+book seats you have forgotten about. Nothing is held while you type: if a seat
+goes in the meantime the booking fails cleanly and you are returned to the map.
 
-Seats booked together belong to one `Booking` and are reserved all-or-nothing: if
-any one of them is taken, none are booked. The limit lives in
+Seats booked together belong to one `Booking` and are reserved all-or-nothing:
+if any one of them is taken, none are booked. The limit lives in
 [`cinema/services.py`](cinema/services.py) as `MAX_SEATS_PER_BOOKING` and is
 enforced on the server; the browser only mirrors it.
 
@@ -164,6 +164,16 @@ details step: pick quantities and the total updates as you go.
 Menu items are priced in yen like tickets. `BookingItem` stores a **snapshot**
 of the price at the time of the order, so changing the menu later cannot alter
 what an existing booking came to.
+
+### The review site
+
+The booking confirmation carries a **Watch and review** button linking to a
+separate project, the [Film Review App](https://film-review-app-19bh.onrender.com/).
+The URL is `REVIEW_SITE_URL` in settings (overridable by environment variable);
+set it to `""` and the button disappears rather than rendering dead.
+
+It opens in a new tab with `rel="noopener noreferrer"` — without `noopener` the
+opened page can reach back into this one through `window.opener`.
 
 ### Live seat availability
 
