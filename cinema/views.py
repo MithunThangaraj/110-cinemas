@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.core.exceptions import ValidationError
@@ -300,6 +301,7 @@ def booking_confirmation(request, reference):
             "can_cancel": (
                 booking.status == "confirmed" and may_cancel(request, booking)
             ),
+            "review_url": settings.REVIEW_SITE_URL,
         },
     )
 

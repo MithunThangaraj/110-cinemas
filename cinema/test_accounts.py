@@ -255,3 +255,34 @@ class TestMemberBookingHistory:
 
         assert response.status_code == 404
         assert seat.is_available is False
+
+
+@pytest.mark.django_db
+class TestReviewSiteLink:
+    """The confirmation links out to the separate film review project."""
+
+    def _confirmation(self, client, future_screening):
+        seat = future_screening.seats.first()
+        book(client, future_screening, [seat])
+        reference = seat.reservations.get(status="confirmed").booking.reference
+        return client.get(reverse("booking-confirmation", args=[reference]))
+
+    def test_the_button_links_to_the_review_site(self, client, future_screening):
+        response = self._confirmation(client, future_screening)
+        body = response.content.decode()
+        assert "Watch and review" in body
+        assert "film-review-app-19bh.onrender.com" in body
+
+    def test_the_link_opens_safely_in_a_new_tab(self, client, future_screening):
+        response = self._confirmation(client, future_screening)
+        body = response.content.decode()
+        assert 'target="_blank"' in body
+        # Without noopener the opened page can reach back via window.opener.
+        assert 'rel="noopener noreferrer"' in body
+
+    def test_no_button_when_no_review_site_is_configured(
+        self, client, future_screening, settings
+    ):
+        settings.REVIEW_SITE_URL = ""
+        response = self._confirmation(client, future_screening)
+        assert b"Watch and review" not in response.content

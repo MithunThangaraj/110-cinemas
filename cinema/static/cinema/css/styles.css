@@ -1675,3 +1675,29 @@ button:hover,
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/* --- Link out to the review site --- */
+
+.confirmation__review {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: var(--space-3) 0 0;
+}
+
+.button--review {
+  background: linear-gradient(135deg, var(--gold), #e08e00);
+  color: #241a00;
+  box-shadow: 0 8px 20px rgba(255, 183, 3, 0.25);
+}
+
+.button__external {
+  margin-left: 0.35rem;
+  font-size: 0.9em;
+}
+
+.confirmation__review-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}

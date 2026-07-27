@@ -167,3 +167,10 @@ if not DEBUG and RENDER_EXTERNAL_HOSTNAME:
 LOGIN_URL = "log-in"
 LOGIN_REDIRECT_URL = "movie-list"
 LOGOUT_REDIRECT_URL = "movie-list"
+
+# An external film review site (a separate project). The booking confirmation
+# links to it so a visitor can review a film after seeing it. Set to "" to hide
+# the link entirely.
+REVIEW_SITE_URL = os.environ.get(
+    "REVIEW_SITE_URL", "https://film-review-app-19bh.onrender.com/"
+)
