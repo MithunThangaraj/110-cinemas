@@ -233,3 +233,16 @@ def menu_by_category():
     for item in items:
         grouped.setdefault(item.get_category_display(), []).append(item)
     return [{"name": name, "items": rows} for name, rows in grouped.items()]
+
+
+def menu_photo_credits():
+    """Photographer and licence for each menu photograph.
+
+    Several of the Commons photographs are CC BY, which asks for attribution,
+    so the credits are collected for one line at the foot of the menu rather
+    than cluttering every card.
+    """
+    return [
+        {"name": item.name, "credit": item.image_credit}
+        for item in MenuItem.objects.filter(is_available=True).exclude(image_credit="")
+    ]

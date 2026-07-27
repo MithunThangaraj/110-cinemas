@@ -210,3 +210,29 @@ class TestFoodInTheBookingFlow:
         assert response.status_code == 302
         booking = seat.reservations.get(status="confirmed").booking
         assert not BookingItem.objects.filter(booking=booking).exists()
+
+
+@pytest.mark.django_db
+class TestPhotoCredits:
+    """Credits are off the cards but not dropped: several photos are CC BY."""
+
+    def test_cards_carry_no_credit_line(self, client, popcorn):
+        popcorn.image_url = "https://example.com/p.jpg"
+        popcorn.image_credit = "Ada / CC BY 2.0"
+        popcorn.save(update_fields=["image_url", "image_credit"])
+
+        response = client.get(reverse("menu"))
+        assert b"menu-card__credit" not in response.content
+
+    def test_the_page_still_credits_the_photographer(self, client, popcorn):
+        popcorn.image_credit = "Ada / CC BY 2.0 / Wikimedia Commons"
+        popcorn.save(update_fields=["image_credit"])
+
+        response = client.get(reverse("menu"))
+        body = response.content.decode()
+        assert "Photo credits" in body
+        assert "Ada / CC BY 2.0" in body
+
+    def test_no_credits_block_when_nothing_is_credited(self, client, cola):
+        response = client.get(reverse("menu"))
+        assert b"Photo credits" not in response.content
