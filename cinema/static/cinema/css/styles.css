@@ -168,19 +168,33 @@ textarea:focus-visible,
 .site-nav ul {
   list-style: none;
   display: flex;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  gap: 0.15rem;
   margin: 0;
   padding: 0;
 }
 
 .site-nav a {
   display: block;
-  padding: 0.4rem 0.85rem;
+  padding: 0.4rem 0.7rem;
   border-radius: 999px;
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 600;
+  /* Labels wrap as whole items, never mid-word. */
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .site-nav ul {
+    gap: var(--space-1);
+  }
+
+  .site-nav a {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.95rem;
+  }
 }
 
 .site-nav a:hover {
@@ -1721,4 +1735,14 @@ button:hover,
   margin: var(--space-1) 0 0;
   padding-left: 1.1rem;
   line-height: 1.6;
+}
+
+/* The one nav item that leaves the site. */
+.site-nav__external {
+  color: var(--gold);
+}
+
+.site-nav__external:hover {
+  color: var(--gold);
+  background: rgba(255, 183, 3, 0.12);
 }

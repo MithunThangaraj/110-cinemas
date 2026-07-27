@@ -286,3 +286,14 @@ class TestReviewSiteLink:
         settings.REVIEW_SITE_URL = ""
         response = self._confirmation(client, future_screening)
         assert b"Watch and review" not in response.content
+
+    def test_the_nav_links_out_on_every_page(self, client, movie):
+        """It was only on the confirmation, which meant booking to find it."""
+        for name in ("movie-list", "menu", "my-bookings", "log-in", "sign-up"):
+            response = client.get(reverse(name))
+            assert b"Watch &amp; Review" in response.content, name
+
+    def test_the_nav_link_is_hidden_when_unconfigured(self, client, settings):
+        settings.REVIEW_SITE_URL = ""
+        response = client.get(reverse("movie-list"))
+        assert b"Watch &amp; Review" not in response.content

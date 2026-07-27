@@ -232,8 +232,9 @@ what an existing booking came to.
 
 ### The review site
 
-The booking confirmation carries a **Watch and review** button linking to a
-separate project, the [Film Review App](https://film-review-app-19bh.onrender.com/).
+**Watch & Review** sits in the site nav on every page, and again as a button on
+the booking confirmation, linking to a separate project — the
+[Film Review App](https://film-review-app-19bh.onrender.com/).
 The URL is `REVIEW_SITE_URL` in settings (overridable by environment variable);
 set it to `""` and the button disappears rather than rendering dead.
 
