@@ -74,6 +74,71 @@ uv run pylint cinema    # lint
 uv run black .          # format
 ```
 
+### Tests
+
+**157 tests, 96% coverage.** Run `uv run pytest --cov` to reproduce the numbers
+below — they are a snapshot, not a badge, so treat the command as the source of
+truth.
+
+| File | Tests | Covers |
+| --- | --- | --- |
+| `test_views.py` | 52 | pages, the booking flow, HTMX partials, polling, cancelling |
+| `test_models.py` | 38 | models, layouts, pricing, and the booking service |
+| `test_accounts.py` | 23 | sign-up, log-in, the member discount, guest booking |
+| `test_menu.py` | 20 | the concession menu and ordering with a booking |
+| `test_posters.py` | 14 | poster lookup and the fetch command |
+| `test_commands.py` | 7 | seeding demo data |
+| `test_forms.py` | 3 | the search form |
+
+`services.py` and `urls.py` are at 100%; `models.py` and `views.py` at 96%. The
+gaps are mostly old migrations, which are not worth exercising.
+
+Some tests worth knowing exist, because they pin decisions rather than
+mechanics:
+
+- **`test_price_is_snapshotted_so_a_menu_change_cannot_alter_a_booking`** —
+  reprices the menu and asserts an existing booking does not move.
+- **`test_changing_the_offer_cannot_rewrite_a_past_booking`** — same idea for
+  the member discount.
+- **`test_seat_map_does_not_scale_queries_with_seat_count`** — caps a 432-seat
+  IMAX page at 12 queries, so the N+1 cannot come back.
+- **`test_a_seat_taken_while_typing_sends_them_back_to_the_map`** — seats are
+  not held during the details step, and that has to fail gracefully.
+- **`test_cancel_requires_a_csrf_token`** — the session check is not the only
+  thing protecting a booking.
+- **`test_partly_cancelled_booking_still_offers_cancelling`** — a regression
+  test for a real bug found in review (see below).
+
+Network calls are never made in tests: `find_poster_url` and `find_image` both
+take their HTTP function as an argument, so the tests inject a fake.
+
+### Code review
+
+Every substantial pull request was reviewed against
+[`.claude/skills/code-review-expert`](.claude/skills/code-review-expert/SKILL.md)
+before merging, with the findings recorded on GitHub:
+
+| PR | Reviewed |
+| --- | --- |
+| [#29](https://github.com/MithunThangaraj/110-cinemas/pull/29) | auditorium formats, yen pricing, live seat map |
+| [#27](https://github.com/MithunThangaraj/110-cinemas/pull/27) | cancelling a booking |
+| [#25](https://github.com/MithunThangaraj/110-cinemas/pull/25) | posters, multi-seat booking |
+| [#23](https://github.com/MithunThangaraj/110-cinemas/pull/23) | interface redesign |
+| [#21](https://github.com/MithunThangaraj/110-cinemas/pull/21) | the render deploy fix |
+
+13 issues, 23 pull requests, each PR closing an issue.
+
+The reviews were not a formality. The one on
+[#27](https://github.com/MithunThangaraj/110-cinemas/pull/27) found a real bug:
+booking status was read from a single reservation, so a booking whose first
+seat had been cancelled on its own reported itself cancelled and hid the cancel
+control — stranding the seats that were still sold. It was reproduced, fixed,
+and pinned with a regression test in the same PR.
+
+The review on [#25](https://github.com/MithunThangaraj/110-cinemas/pull/25)
+raised the `Seat.is_available` N+1 while it was still harmless at 96 seats;
+it was fixed when IMAX GT made it ~430 queries on the busiest page.
+
 ## How it works
 
 ### The data model
