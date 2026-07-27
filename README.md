@@ -274,7 +274,9 @@ licensed, which is why the menu can use real photographs where film posters
 cannot. Files are looked up by exact title rather than by search — a search for
 "nachos" returns a portrait of the man who invented them — so each item stores
 the Commons file title in `image_source`. The photographer and licence are
-stored alongside and shown under each item, since some licences ask for credit.
+stored alongside and listed under **Photo credits** at the foot of the menu —
+six of the ten photographs are CC BY, which asks for attribution, so the credit
+is kept off the cards rather than dropped.
 
 Set `Movie.poster_image` or `MenuItem.image_url` by hand in the admin to
 override either result.

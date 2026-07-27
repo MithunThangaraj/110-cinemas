@@ -1701,3 +1701,24 @@ button:hover,
   color: var(--muted);
   font-size: 0.82rem;
 }
+
+/* --- Photo credits, kept out of the way --- */
+
+.credits {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.credits__summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.credits__list {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.1rem;
+  line-height: 1.6;
+}

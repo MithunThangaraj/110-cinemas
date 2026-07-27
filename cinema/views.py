@@ -19,6 +19,7 @@ from .services import (
     create_booking,
     may_cancel,
     menu_by_category,
+    menu_photo_credits,
     parse_item_quantities,
     remember_booking,
     seat_rows,
@@ -70,7 +71,11 @@ def sign_up(request):
 
 
 def menu(request):
-    return render(request, "cinema/menu.html", {"menu": menu_by_category()})
+    return render(
+        request,
+        "cinema/menu.html",
+        {"menu": menu_by_category(), "credits": menu_photo_credits()},
+    )
 
 
 def _reservation_context(screening, selected_seats=(), seat_error=None):

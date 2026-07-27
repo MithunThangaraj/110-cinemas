@@ -33,9 +33,6 @@
                 <p class="menu-card__description">{{ item.description }}</p>
                 {% endif %}
                 <p class="menu-card__price">&yen;{{ item.price|intcomma }}</p>
-                {% if item.image_credit %}
-                <p class="menu-card__credit">Photo: {{ item.image_credit }}</p>
-                {% endif %}
             </div>
         </li>
         {% endfor %}
@@ -47,4 +44,19 @@
     <a class="button" href="{% url 'movie-list' %}">Browse movies</a>
 </div>
 {% endfor %}
+
+{% if credits %}
+{% comment %}
+Kept off the cards but not dropped: several of these photographs are CC BY,
+which asks for attribution.
+{% endcomment %}
+<details class="credits">
+    <summary class="credits__summary">Photo credits</summary>
+    <ul class="credits__list">
+        {% for credit in credits %}
+        <li>{{ credit.name }} — {{ credit.credit }}</li>
+        {% endfor %}
+    </ul>
+</details>
+{% endif %}
 {% endblock %}
