@@ -163,6 +163,20 @@ Two things on there are worth knowing about:
 The source is [`docs/schema.puml`](docs/schema.puml); re-render it with the
 command in [`docs/README.md`](docs/README.md) if the models change.
 
+### The listing
+
+The movie list splits in two:
+
+- **Now showing** — films with at least one screening still to come. Only these
+  are bookable, so a screening link on the page always leads somewhere.
+- **Coming soon** — everything else, shown with its release date and no booking
+  links.
+
+The split is on *upcoming screenings*, not release date, so a film whose
+screenings have all been and gone drops out of "now showing" by itself. Nothing
+ever disappears from the catalogue: a film with no schedule is advertised
+rather than hidden.
+
 ### Auditoriums, seat maps and prices
 
 A screening runs in an **`Auditorium`**, whose format decides both its seat map

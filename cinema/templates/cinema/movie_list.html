@@ -20,14 +20,34 @@
     </form>
 </section>
 
+{% if showing %}
 <ul class="movie-grid">
-    {% for movie in movies %}
+    {% for movie in showing %}
     {% include "cinema/_movie_card.html" %}
-    {% empty %}
-    <li class="empty-state">
-        <p>No movies match that search.</p>
-        <a class="button button--ghost" href="{% url 'movie-list' %}">Show everything</a>
-    </li>
     {% endfor %}
 </ul>
+{% endif %}
+
+{% if coming_soon %}
+<section class="coming-soon">
+    <h3 class="coming-soon__title">Coming soon</h3>
+    <p class="coming-soon__lead">Not on sale yet. Tickets open nearer the date.</p>
+    <ul class="movie-grid">
+        {% for movie in coming_soon %}
+        {% include "cinema/_movie_card.html" with upcoming=True %}
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if not showing and not coming_soon %}
+<div class="empty-state">
+    {% if searching %}
+    <p>No movies match that search.</p>
+    <a class="button button--ghost" href="{% url 'movie-list' %}">Show everything</a>
+    {% else %}
+    <p>There is nothing in the catalogue yet.</p>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

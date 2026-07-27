@@ -1,5 +1,5 @@
 {% load humanize %}
-<li class="movie-card">
+<li class="movie-card {% if upcoming %}movie-card--upcoming{% endif %}">
     <div class="movie-card__art">
         {% include "cinema/_poster.html" %}
     </div>
@@ -16,6 +16,12 @@
         <p class="movie-card__description">{{ movie.description }}</p>
         {% endif %}
 
+        {% if upcoming %}
+        <p class="movie-card__release">
+            In cinemas from
+            <strong>{{ movie.release_date|date:"j F Y" }}</strong>
+        </p>
+        {% else %}
         <h4 class="movie-card__subhead">Screenings</h4>
         <ul class="screening-list">
             {% for screening in movie.screenings.all %}
@@ -26,9 +32,8 @@
                     <span class="screening__price">from &yen;{{ screening.cheapest_price|intcomma }}</span>
                 </a>
             </li>
-            {% empty %}
-            <li class="screening-list__empty">No screenings scheduled.</li>
             {% endfor %}
         </ul>
+        {% endif %}
     </div>
 </li>

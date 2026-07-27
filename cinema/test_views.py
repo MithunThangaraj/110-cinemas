@@ -51,6 +51,83 @@ class TestMovieList:
 
 
 @pytest.mark.django_db
+class TestComingSoon:
+    """The listing splits into what you can book and what is not out yet."""
+
+    def _upcoming(self, movie_kwargs=None):
+        from datetime import date
+
+        from .models import Movie
+
+        return Movie.objects.create(
+            title="The Longest Winter",
+            release_date=date(2099, 1, 1),
+            runtime_minutes=128,
+            **(movie_kwargs or {}),
+        )
+
+    def test_a_film_with_screenings_is_now_showing(
+        self, client, future_screening, movie
+    ):
+        response = client.get(reverse("movie-list"))
+        body = response.content.decode()
+        # Its screening is bookable, so it is above the Coming soon divider.
+        before = body.split("coming-soon__title")[0]
+        assert movie.title in before
+
+    def test_a_film_with_no_screenings_is_coming_soon(self, client):
+        upcoming = self._upcoming()
+        response = client.get(reverse("movie-list"))
+        body = response.content.decode()
+        assert "coming-soon__title" in body
+        assert upcoming.title in body.split("coming-soon__title")[1]
+
+    def test_coming_soon_films_are_not_bookable(self, client):
+        self._upcoming()
+        response = client.get(reverse("movie-list"))
+        soon = response.content.decode().split("coming-soon__title")[1]
+        assert "/seats/" not in soon
+
+    def test_coming_soon_shows_the_release_date(self, client):
+        self._upcoming()
+        response = client.get(reverse("movie-list"))
+        assert b"In cinemas from" in response.content
+        assert b"1 January 2099" in response.content
+
+    def test_no_coming_soon_block_when_everything_is_scheduled(
+        self, client, future_screening
+    ):
+        response = client.get(reverse("movie-list"))
+        assert b"coming-soon__title" not in response.content
+
+    def test_a_past_screening_does_not_count_as_now_showing(
+        self, client, movie, auditorium
+    ):
+        """A film whose screenings have all been and gone is not bookable."""
+        from .models import Screening
+
+        past = Screening(
+            movie=movie,
+            auditorium=auditorium,
+            start_time=timezone.now() - timedelta(days=1),
+            base_price=2000,
+        )
+        # Bypass the future-date validation to create a screening in the past.
+        Screening.objects.bulk_create([past])
+
+        response = client.get(reverse("movie-list"))
+        body = response.content.decode()
+        assert movie.title in body.split("coming-soon__title")[1]
+
+    def test_search_looks_in_both_sections(self, client, movie):
+        upcoming = self._upcoming()
+        response = client.get(reverse("movie-list"), {"q": "longest"})
+        body = response.content.decode()
+        assert upcoming.title in body
+        assert movie.title not in body
+
+
+@pytest.mark.django_db
 class TestSeatSelection:
     def test_seat_selection_lists_seats(self, client, future_screening):
         response = client.get(reverse("seat-selection", args=[future_screening.id]))

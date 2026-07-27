@@ -98,6 +98,53 @@ DEMO_SCREENINGS = [
 ]
 
 
+# Films announced but not yet scheduled: they carry a future release date and
+# no screenings, so they land in "Coming soon". Deliberately invented rather
+# than real unreleased films, whose dates would be guesses - and they show off
+# the generated key-art, since a film that is not out has no poster to fetch.
+DEMO_UPCOMING = [
+    (
+        "The Longest Winter",
+        "A lighthouse keeper and a stranded pilot wait out a storm that will "
+        "not end.",
+        180,
+        128,
+    ),
+    (
+        "Paper Moons",
+        "Two estranged sisters drive across the country to sell their late "
+        "father's observatory.",
+        240,
+        104,
+    ),
+    (
+        "Neon Harbour",
+        "A dock worker uncovers a smuggling ring hidden under the night market.",
+        300,
+        118,
+    ),
+    (
+        "Silent Orbit",
+        "A repair crew wakes to find their station has drifted out of contact.",
+        420,
+        137,
+    ),
+]
+
+
+def create_upcoming(today):
+    """Films to advertise before they open. No screenings by design."""
+    for title, description, days_away, runtime in DEMO_UPCOMING:
+        Movie.objects.get_or_create(
+            title=title,
+            defaults={
+                "description": description,
+                "release_date": today + timedelta(days=days_away),
+                "runtime_minutes": runtime,
+            },
+        )
+
+
 def create_auditoriums():
     """Create the screens, one per format plus a second standard room."""
     auditoriums = {}
@@ -247,9 +294,12 @@ class Command(BaseCommand):
             # like a real schedule rather than the same rows repeated.
             create_screenings(movie, DEMO_SCREENINGS[: 2 + index % 3], now, auditoriums)
 
+        create_upcoming(now.date())
+
         self.stdout.write(
             self.style.SUCCESS(
-                f"Seeded {Movie.objects.count()} movies, "
+                f"Seeded {Movie.objects.count()} movies "
+                f"({len(DEMO_UPCOMING)} coming soon), "
                 f"{Screening.objects.count()} screenings "
                 f"and {MenuItem.objects.count()} menu items."
             )

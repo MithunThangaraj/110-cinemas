@@ -1746,3 +1746,49 @@ button:hover,
   color: var(--gold);
   background: rgba(255, 183, 3, 0.12);
 }
+
+/* ==========================================================================
+   Coming soon
+   ========================================================================== */
+
+.coming-soon {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.coming-soon__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.coming-soon__lead {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Not bookable yet, so it sits back a little from the films that are. */
+.movie-card--upcoming {
+  border-style: dashed;
+  background: linear-gradient(160deg, rgba(20, 20, 31, 0.7), rgba(8, 8, 15, 0.5));
+}
+
+.movie-card--upcoming .poster {
+  opacity: 0.85;
+}
+
+.movie-card__release {
+  margin: var(--space-1) 0 0;
+  padding: 0.4rem 0.7rem;
+  display: inline-block;
+  border: 1px solid rgba(86, 204, 242, 0.4);
+  border-radius: 999px;
+  background: rgba(86, 204, 242, 0.1);
+  color: var(--cyan);
+  font-size: 0.8rem;
+}
