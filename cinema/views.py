@@ -24,6 +24,7 @@ from .services import (
     remember_booking,
     seat_rows,
     seats_with_availability,
+    split_catalogue,
     validate_selection,
 )
 
@@ -42,9 +43,21 @@ def index(request):
 def movie_list(request):
     form = MovieSearchForm(request.GET)
     movies = Movie.objects.all()
-    if form.is_valid() and form.cleaned_data["q"]:
+    searching = form.is_valid() and form.cleaned_data["q"]
+    if searching:
         movies = movies.filter(title__icontains=form.cleaned_data["q"])
-    return render(request, "cinema/movie_list.html", {"movies": movies, "form": form})
+
+    showing, coming_soon = split_catalogue(movies)
+    return render(
+        request,
+        "cinema/movie_list.html",
+        {
+            "showing": showing,
+            "coming_soon": coming_soon,
+            "searching": bool(searching),
+            "form": form,
+        },
+    )
 
 
 def sign_up(request):

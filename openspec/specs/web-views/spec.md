@@ -13,7 +13,9 @@ redirects (HTTP 302) to the movie list page.
 
 ### Requirement: Movie list page
 The system SHALL expose `GET /movies/` (name: `movie-list`) that returns an HTML
-page listing movies (title and release date) and a search form. It SHALL accept
+page listing movies and a search form. The listing SHALL be split into films
+that are bookable now (those with a screening still to come) and films that are
+not yet scheduled. A search SHALL cover both. It SHALL accept
 an optional `q` query parameter (a title search) submitted via a **GET** form;
 when `q` is provided, the list SHALL be filtered to movies whose title contains
 `q` (case-insensitive).
@@ -22,6 +24,12 @@ when `q` is provided, the list SHALL be filtered to movies whose title contains
 - **WHEN** a browser sends `GET /movies/`
 - **THEN** the response SHALL be HTTP 200 with an HTML page containing the title
   of every `Movie` in the database
+
+#### Scenario: Splitting the listing
+- **WHEN** a browser sends `GET /movies/`
+- **THEN** films with at least one screening in the future SHALL be listed as
+  "now showing" with links to book them, and every other film SHALL be listed
+  as "coming soon" with its release date and no booking links
 
 #### Scenario: Searching movies by title
 - **WHEN** a browser sends `GET /movies/?q=<term>`

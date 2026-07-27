@@ -4,8 +4,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef
+from django.utils import timezone
 
-from .models import Booking, BookingItem, MenuItem, Reservation, Seat
+from .models import Booking, BookingItem, MenuItem, Reservation, Screening, Seat
 
 # How many seats one visitor may reserve in a single booking.
 MAX_SEATS_PER_BOOKING = 6
@@ -246,3 +247,24 @@ def menu_photo_credits():
         {"name": item.name, "credit": item.image_credit}
         for item in MenuItem.objects.filter(is_available=True).exclude(image_credit="")
     ]
+
+
+def split_catalogue(movies):
+    """Divide the catalogue into what is bookable now and what is not yet.
+
+    "Now showing" means the film has at least one screening still to come, so
+    the section only ever contains films you can actually book. Everything else
+    falls into "coming soon" rather than vanishing: a film with no schedule yet
+    is still worth advertising.
+    """
+    upcoming = Screening.objects.filter(
+        movie=OuterRef("pk"), start_time__gte=timezone.now()
+    )
+    annotated = movies.annotate(has_screening=Exists(upcoming)).prefetch_related(
+        "screenings__auditorium"
+    )
+
+    showing, soon = [], []
+    for movie in annotated:
+        (showing if movie.has_screening else soon).append(movie)
+    return showing, soon
